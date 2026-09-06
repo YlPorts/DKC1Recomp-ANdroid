@@ -5,6 +5,8 @@
 #import <QuartzCore/QuartzCore.h>
 
 #include "dkc1_video.h"
+#include "desktop_refresh.h"
+#import "macos_graphics.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,13 +26,6 @@ typedef struct Dkc1MetalFrame {
   uint64_t sequence;
   Dkc1MacPresentationFrameInfo info;
 } Dkc1MetalFrame;
-
-typedef struct Dkc1MetalShaderParameters {
-  float sourceSize[2];
-  float destinationSize[2];
-  uint32_t scaling;
-  uint32_t padding;
-} Dkc1MetalShaderParameters;
 
 typedef struct Dkc1MetalTraceFrame {
   uint64_t sequence;
@@ -76,8 +71,8 @@ typedef struct Dkc1MetalTraceFrame {
   CAMetalLayer *metalLayer;
   id<MTLDevice> device;
   id<MTLCommandQueue> commandQueue;
-  id<MTLRenderPipelineState> pipeline;
-  id<MTLTexture> sourceTexture;
+  Dkc1MetalGraphics *graphics;
+  Dkc1GraphicsSettings graphicsSettings;
   CAMetalDisplayLink *displayLink;
   NSThread *displayThread;
   NSCondition *condition;
@@ -95,6 +90,7 @@ typedef struct Dkc1MetalTraceFrame {
   BOOL hasCurrentFrame;
   unsigned currentRepeats;
   unsigned repeatGoal;
+  Dkc1Refresh refresh;
   unsigned callbacksWithoutFrame;
   uint64_t nextSequence;
   uint64_t uploadedSequence;
@@ -126,85 +122,12 @@ typedef struct Dkc1MetalTraceFrame {
 
 static Dkc1MetalPresenter *s_metal_presenter;
 
-static NSString *const kDkc1MetalShaderSource =
-    @"#include <metal_stdlib>\n"
-     "using namespace metal;\n"
-     "struct VertexOutput { float4 position [[position]]; float2 uv; };\n"
-     "struct ShaderParameters {\n"
-     "  float2 sourceSize; float2 destinationSize;\n"
-     "  uint scaling; uint padding;\n"
-     "};\n"
-     "vertex VertexOutput dkc1_vertex(uint vertexId [[vertex_id]]) {\n"
-     "  const float2 positions[] = {\n"
-     "    float2(-1.0, 1.0), float2(-1.0, -1.0),\n"
-     "    float2(1.0, 1.0), float2(1.0, -1.0) };\n"
-     "  const float2 coordinates[] = {\n"
-     "    float2(0.0, 0.0), float2(0.0, 1.0),\n"
-     "    float2(1.0, 0.0), float2(1.0, 1.0) };\n"
-     "  VertexOutput output;\n"
-     "  output.position = float4(positions[vertexId], 0.0, 1.0);\n"
-     "  output.uv = coordinates[vertexId]; return output;\n"
-     "}\n"
-     "fragment float4 dkc1_fragment(\n"
-     "    VertexOutput input [[stage_in]],\n"
-     "    texture2d<float> source [[texture(0)]],\n"
-     "    constant ShaderParameters &parameters [[buffer(0)]]) {\n"
-     "  constexpr sampler nearestSampler(coord::normalized,\n"
-     "      address::clamp_to_edge, filter::nearest);\n"
-     "  constexpr sampler linearSampler(coord::normalized,\n"
-     "      address::clamp_to_edge, filter::linear);\n"
-     "  if (parameters.scaling == 0)\n"
-     "    return source.sample(linearSampler, input.uv);\n"
-     "  if (parameters.scaling == 2)\n"
-     "    return source.sample(nearestSampler, input.uv);\n"
-     "  const float2 texel = input.uv * parameters.sourceSize - 0.5;\n"
-     "  const float2 base = floor(texel);\n"
-     "  const float2 fraction = fract(texel);\n"
-     "  const float2 scale = max(parameters.destinationSize /\n"
-     "      parameters.sourceSize, float2(1.0));\n"
-     "  const float2 flatRegion = 0.5 - 0.5 / scale;\n"
-     "  const float2 adjusted = clamp((fraction - flatRegion) * scale,\n"
-     "      float2(0.0), float2(1.0));\n"
-     "  const float2 coordinate =\n"
-     "      (base + adjusted + 0.5) / parameters.sourceSize;\n"
-     "  return source.sample(linearSampler, coordinate);\n"
-     "}\n";
-
 @implementation Dkc1MetalPresenter
 
 - (BOOL)buildPipeline:(NSError **)outError {
-  id<MTLLibrary> library =
-      [device newLibraryWithSource:kDkc1MetalShaderSource
-                           options:nil error:outError];
-  if (!library)
-    return NO;
-  id<MTLFunction> vertex = [library newFunctionWithName:@"dkc1_vertex"];
-  id<MTLFunction> fragment = [library newFunctionWithName:@"dkc1_fragment"];
-  if (!vertex || !fragment) {
-    if (outError) {
-      *outError = [NSError errorWithDomain:@"DKC1MetalPresenter"
-                                      code:1
-                                  userInfo:@{
-        NSLocalizedDescriptionKey: @"Unable to load the Metal shader functions"
-      }];
-    }
-    [vertex release];
-    [fragment release];
-    [library release];
-    return NO;
-  }
-  MTLRenderPipelineDescriptor *descriptor =
-      [[MTLRenderPipelineDescriptor alloc] init];
-  descriptor.vertexFunction = vertex;
-  descriptor.fragmentFunction = fragment;
-  descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-  pipeline = [device newRenderPipelineStateWithDescriptor:descriptor
-                                                    error:outError];
-  [descriptor release];
-  [vertex release];
-  [fragment release];
-  [library release];
-  return pipeline != nil;
+  graphics=[[Dkc1MetalGraphics alloc] initWithDevice:device shaderPath:nil error:outError];
+  Dkc1GraphicsDefault(&graphicsSettings);
+  return graphics!=nil;
 }
 
 - (void)runDisplayThread {
@@ -247,15 +170,12 @@ static NSString *const kDkc1MetalShaderSource =
         update.targetPresentationTimestamp;
     const CFTimeInterval targetTimestamp = update.targetTimestamp;
     const CFTimeInterval callbackTimestamp = CACurrentMediaTime();
-    if (previousTargetPresentation > 0.0) {
-      const double interval =
-          targetPresentation - previousTargetPresentation;
-      if (interval > 0.0 && interval < 0.100)
-        repeatGoal = interval < (1.0 / 90.0) ? 2u : 1u;
-    }
-    previousTargetPresentation = targetPresentation;
-
     [frameLock lock];
+    if (previousTargetPresentation > 0.0)
+      Dkc1RefreshObserve(&refresh,
+          targetPresentation - previousTargetPresentation);
+    previousTargetPresentation = targetPresentation;
+    repeatGoal = (unsigned)refresh.divisor;
     if (!active) {
       [frameLock unlock];
       return;
@@ -281,7 +201,7 @@ static NSString *const kDkc1MetalShaderSource =
         hasCurrentFrame = YES;
         currentRepeats = 0;
       }
-    } else if (currentRepeats >= repeatGoal) {
+    } else if (Dkc1RefreshAdvance(&refresh, targetPresentation, currentRepeats)) {
       while (count > 2) {
         head = (head + 1) % kDkc1MetalFrameSlots;
         count--;
@@ -308,35 +228,8 @@ static NSString *const kDkc1MetalShaderSource =
     const uint64_t presentProducerDrops = producerDrops;
     const uint64_t presentConsumerSkips = consumerSkips;
     const uint64_t presentStarvedCallbacks = starvedCallbacks;
-    const BOOL presentFullscreen = fullscreen;
-    const Dkc1MacFullscreenScaling presentScaling = scaling;
+    const Dkc1GraphicsSettings presentSettings=graphicsSettings;
     Dkc1MetalFrame *presentFrame = &currentFrame;
-    if (!sourceTexture || sourceTexture.width != (NSUInteger)presentFrame->width ||
-        sourceTexture.height != (NSUInteger)presentFrame->height) {
-      [sourceTexture release];
-      MTLTextureDescriptor *textureDescriptor =
-          [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:
-              MTLPixelFormatBGRA8Unorm
-                                                   width:presentFrame->width
-                                                  height:presentFrame->height
-                                               mipmapped:NO];
-      textureDescriptor.storageMode = MTLStorageModeShared;
-      textureDescriptor.usage = MTLTextureUsageShaderRead;
-      sourceTexture = [device newTextureWithDescriptor:textureDescriptor];
-    }
-    if (!sourceTexture) {
-      [frameLock unlock];
-      return;
-    }
-    if (uploadedSequence != presentFrame->sequence) {
-      [sourceTexture replaceRegion:MTLRegionMake2D(
-                                       0, 0, presentFrame->width,
-                                       presentFrame->height)
-                           mipmapLevel:0
-                             withBytes:presentFrame->pixels
-                           bytesPerRow:(NSUInteger)presentFrame->width * 4];
-      uploadedSequence = presentFrame->sequence;
-    }
     const int sourceWidth = presentFrame->width;
     const int sourceHeight = presentFrame->height;
     const int framePresentationWidth = presentFrame->presentationWidth;
@@ -366,33 +259,11 @@ static NSString *const kDkc1MetalShaderSource =
     const int fittedX = ((int)outputWidth - fittedWidth) / 2;
     const int fittedY = ((int)outputHeight - fittedHeight) / 2;
 
-    MTLRenderPassDescriptor *pass = [MTLRenderPassDescriptor renderPassDescriptor];
-    pass.colorAttachments[0].texture = drawable.texture;
-    pass.colorAttachments[0].loadAction = MTLLoadActionClear;
-    pass.colorAttachments[0].storeAction = MTLStoreActionStore;
-    pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
     id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-    id<MTLRenderCommandEncoder> encoder =
-        [commandBuffer renderCommandEncoderWithDescriptor:pass];
-    [encoder setRenderPipelineState:pipeline];
-    [encoder setViewport:(MTLViewport){
-      .originX = fittedX, .originY = fittedY,
-      .width = fittedWidth, .height = fittedHeight,
-      .znear = 0.0, .zfar = 1.0
-    }];
-    [encoder setFragmentTexture:sourceTexture atIndex:0];
-    Dkc1MetalShaderParameters parameters = {
-      .sourceSize = {(float)sourceWidth, (float)sourceHeight},
-      .destinationSize = {(float)fittedWidth, (float)fittedHeight},
-      .scaling = (uint32_t)(presentFullscreen ? presentScaling
-                                             : kDkc1MacFullscreenPixelSharp),
-      .padding = 0,
-    };
-    [encoder setFragmentBytes:&parameters
-                       length:sizeof parameters atIndex:0];
-    [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
-                vertexStart:0 vertexCount:4];
-    [encoder endEncoding];
+    if (![graphics encodePixels:(const uint32_t *)presentFrame->pixels
+        width:sourceWidth height:sourceHeight target:drawable.texture
+        viewport:(MTLViewport){fittedX,fittedY,fittedWidth,fittedHeight,0,1}
+        settings:presentSettings commandBuffer:commandBuffer]) return;
 
     [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> completed) {
       if (completed.status == MTLCommandBufferStatusError) {
@@ -480,8 +351,7 @@ static NSString *const kDkc1MetalShaderSource =
     fflush(trace);
     fclose(trace);
   }
-  [sourceTexture release];
-  [pipeline release];
+  [graphics release];
   [commandQueue release];
   [device release];
   [displayLink release];
@@ -650,6 +520,17 @@ void Dkc1MacMetalPresenterSetGeometry(int newPresentationWidth,
   [presenter->frameLock unlock];
 }
 
+void Dkc1MacMetalPresenterFlush(void) {
+  Dkc1MetalPresenter *presenter = s_metal_presenter;
+  if (!presenter) return;
+  [presenter->frameLock lock];
+  presenter->head = presenter->tail = presenter->count = 0;
+  presenter->hasCurrentFrame = NO;
+  presenter->currentRepeats = presenter->callbacksWithoutFrame = 0;
+  presenter->refresh.next_frame_time = 0.0;
+  [presenter->frameLock unlock];
+}
+
 void Dkc1MacMetalPresenterSetScaling(Dkc1MacFullscreenScaling newScaling) {
   Dkc1MetalPresenter *presenter = s_metal_presenter;
   if (!presenter)
@@ -667,6 +548,8 @@ void Dkc1MacMetalPresenterSetActive(int newActive) {
   [presenter->frameLock lock];
   if (presenter->active != active) {
     presenter->active = active;
+    Dkc1RefreshReset(&presenter->refresh);
+    presenter->previousTargetPresentation = 0.0;
     presenter->head = presenter->tail = presenter->count = 0;
     presenter->hasCurrentFrame = NO;
     presenter->currentRepeats = 0;
@@ -695,4 +578,12 @@ void Dkc1MacMetalPresenterStop(void) {
     [presenter->view removeFromSuperview];
     [presenter release];
   }
+}
+
+void Dkc1MacMetalPresenterSetGraphics(const Dkc1GraphicsSettings *settings) {
+  Dkc1MetalPresenter *presenter=s_metal_presenter;
+  if (!presenter || !settings) return;
+  [presenter->frameLock lock];
+  presenter->graphicsSettings=*settings;
+  [presenter->frameLock unlock];
 }

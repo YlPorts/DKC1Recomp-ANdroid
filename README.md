@@ -43,6 +43,21 @@ Headerless *Donkey Kong Country* USA v1.0:
 The ROM must remain outside Git. No ROM bytes, extracted assets, or generated
 game code are committed.
 
+For controlled testing of a data-only ROM produced by a level editor, the
+runtime can opt into one exact modified 4 MB payload. Set
+`DKC1_ALLOW_ROM_SHA256` to that file's complete SHA-256 digest and pass the same
+file on the command line. This does not disable verification: a missing,
+malformed, or non-matching value is rejected, and the clean retail digest
+remains the only accepted default. Because the native game code was generated
+from the supported retail ROM, use this development override only for a patch
+whose changed ranges have been audited as data.
+
+The macOS host also accepts `DKC1_STARTUP_SCRIPT=/path/to/route.dks` for editor
+playtests. It runs an input/wait-only deterministic route from clean power-on
+before showing the first interactive frame; save-state and checkpoint commands
+are rejected. RainbowZ combines this with an exact modified-ROM hash pin to
+open its generated Jungle Hijinxs level directly without a reusable save state.
+
 ## Debugging and validation
 
 The widescreen port is developed from byte-exact, deterministic evidence—not
@@ -147,6 +162,13 @@ renderer wait independently. `DKC1_DISABLE_DISPLAY_LINK=1` and
 `DKC1_DISABLE_VSYNC=1` remain explicit negative overrides.
 `SNESRECOMP_INPUT_PLAY=path` supplies the same deterministic
 per-frame input playback supported by the Windows debugger for visible Mac QA.
+
+**Escape → Settings → Aquatic widescreen fixes** enables the water-level
+presentation improvements tested in this build. This experimental option is
+off by default and takes effect after restarting the app. It includes native
+edge protection, live water scroll alignment, cache-boundary and bottom-row
+repairs, and verified Coral Capers wall continuations. Whole-game entrance
+coverage is still incomplete; see [the validation record](docs/WIDESCREEN_WALL_SEAM.md).
 
 The optional **Mods > Baby Kong** switch replaces active Donkey with Kiddy
 Kong's DKC3 gameplay frames and a heavier, Kiddy-inspired movement profile.

@@ -42,6 +42,10 @@ sidecars; loading a state from a different build warns.
 inward clamp released over eight margins of travel, `reflect`, `bars`,
 `shift` = pre-policy inward clamp, the A/B reference for wall reports),
 `DKC1_SCRIPT` (route .dks), `SNESRECOMP_INPUT_PLAY` (raw input replay),
+`DKC1_STARTUP_SCRIPT` (macOS input/wait-only .dks route run unthrottled before
+the first interactive frame; state and checkpoint directives fail closed),
+`DKC1_ALLOW_ROM_SHA256` (development-only exact 4 MB modified-ROM pin;
+retail verification remains the default and malformed/non-matching pins fail),
 `DKC1_SAVESTATE_INPUT` (load state at boot), `DKC1_SAVESTATE_OUTPUT` /
 `DKC1_SAVESTATE_SAVE_AT` (save at frame), `DKC1_SRAM_INPUT`,
 `DKC1_SUPERZSNES_STATE` (import emulator state bundle),
@@ -348,3 +352,51 @@ bookkeeping `$192B` len $100 · collision flags `$12A5` · invuln `$11A1`.
   dispatch xrefs; rebuildable headlessly
 - `reference/legacy-widescreen/` — the retired SuperZSNES-era emulator
   hack (worklogs/tools; prior art only, never current workflow)
+
+## Aquatic presentation A/B switches (2026-09-06)
+
+`DKC1_WS_PIXEL_BOUNDARIES=1`, `DKC1_WS_LIVE_SCROLL=1`, and
+`DKC1_WS_WALL_ADJACENCY=1` independently opt into the DKC2/DKC3 presentation
+backports. All require the exact value `1` and default off pending the full
+40-entrance gate. The first protects native pixels in straddling 4bpp chunks
+and repeat bands; the second uses live scanline scroll for shadow X; the third
+uses structurally constrained map adjacency for vertical wall continuation.
+Trace additions: root `presentation_features` is a 1/2/4 bitmask;
+`boundary_adjacency_tiles` counts successful adjacency-derived 8x8 entries and
+is included in `boundary_continuation_tiles`. Failed/ambiguous chains leave
+the original decoded tile intact. `DKC1_ASPECT=16:10` now selects the existing
+308x224 mode in headless and layer-capture hosts when widescreen is enabled.
+Use `DKC1_WIDESCREEN_EDGE=shift` for an unbiased native-center oracle.
+See `docs/WIDESCREEN_AQUATIC_BACKPORTS.md` for commands, acceptance scope, and
+the paused local candidate bundle.
+
+## September 6 Mac host and cache-boundary additions
+
+- `DKC1_WS_SCROLL_REBASE=1`: default-off, currently calibrated cache rebuild on the exhausted-window frame. It also captures the live native guard row on calibrated fine-Y=7 frames, including ordinary scrolling without a rebase. WS trace feature bit 8 identifies the option; `decision.cache_rebase` identifies actual origin rebuilds only. `verify_shadow_localization.py` requires a calibrated cold commit for any marked origin change. See `docs/WIDESCREEN_WATER_FLASH.md`, `docs/WIDESCREEN_CAMERA_AUDIT.md`, and the Croctopus/Coral regression recipes.
+- Native **Game → Controls and Assist…** exposes source routing, remapping, analog deadzones, and opt-in rewind/3× fast-forward. Default Assist holds: Backspace/Tab or left/right triggers. Game time remains canonical. Rewind memory is capped at 128 MiB; actual history duration depends on serialized-state capacity. See `docs/HOST_ADOPTION_IMPLEMENTATION.md`.
+- `DKC1_ASSIST_TEST_INPUT=<input file>`: default-off Mac-only host-action schedule using the existing hex/repetition format; masks 1=rewind, 2=fast-forward, 4=quick-save, 8=quick-load. It enables Assist only for that run. Save/load actions operate the normal quicksave path; do not use those bits against a tester's only state. `DKC1_ASSIST_TEST_LOG=<path>` optionally records host tick, host/guest frame, pops, and history depth. Gameplay playback stays independent and is abandoned after a rewind/load.
+- `DKC1_PAUSE_AFTER_FRAME=<positive host frame>`: default-off Mac exact-frame pause. Clears gameplay and host-action schedules and stops sound/rumble; preserves the actual submitted pixels for window capture. `DKC1_SAVESTATE_OUTPUT` also works at graceful Mac shutdown. Use private paths, not the user's normal slots.
+- `DKC1_PACING_LOG` adds `audio_ratio`, `audio_fill_average`, and `audio_target_frames`. Canonical production is unchanged; only mixed host PCM is resampled. `DKC1_SCANOUT_LOG` repeat goal 0 means unqualified/non-integer cadence using target timestamps; goals 1–4 are qualified divisors.
+- Flight bundles and post-failure input tails preserve both controllers as six-digit masks. The verifier accepts both historical three-digit and new six-digit masks. Existing bundle schema and hashes remain valid.
+
+## Mac graphics presentation checks (2026-09-06)
+
+- **Escape** opens the native pause panel when windowed (exits fullscreen first). **View → Graphics Settings…** opens its graphics tab. Reconstruct, CRT, and color profiles affect only displayed pixels. Raw plane/WS traces remain the oracle. Settings persist under `GraphicsV1`; use a separate bundle identifier for preference-isolated QA.
+- `DKC1_USER_DIR=<absolute existing directory>` overrides the Mac host's normal save/working directory. Use it with a separate QA bundle to protect user slots. It does not isolate NSUserDefaults by itself. Default behavior remains SDL's application support path.
+- Optional Mac startup overrides: `DKC1_DISPLAY=flat|crt`, `DKC1_UPSCALER=nearest|bilinear|reconstruct|sharp-bilinear`, `DKC1_SCREEN=raw|crt|composite|trinitron`, `DKC1_CRT_PRESET=living-room|studio|soft`, `DKC1_RECONSTRUCT_MODE=0..4`, and `DKC1_RECONSTRUCT_STRENGTH`, `DKC1_RECONSTRUCT_SOFTNESS`, `DKC1_RECONSTRUCT_SHADING` in 0..100. Invalid numeric settings clamp; omitted variables retain saved/default settings.
+- `cmake --build build/macos --target test_macos_graphics`, then `build/macos/test_macos_graphics runner/macos_graphics.metal [existing-output-directory] [input.ppm]` runs offscreen Metal native-pixel, shader, repeated-frame, and cache-invalidation checks. Input is binary P6; omitted input generates an edge/dither pattern. Output contains twelve PPMs. `DKC1_TEST_SCALE=1..16` (default 4) and `DKC1_TEST_PIXEL_ASPECT=1` optionally control output geometry. Exit 77 means no Metal device; exit 1 is failure. These test-only variables do not affect the app.
+- Five slots use `quicksave.state`, `slot2.state` … `slot5.state`. Quick Save/Load and their keyboard/Assist actions operate the selected slot. See `docs/GRAPHICS_OPTIONS_PORT.md` for architecture, donor comparison, screenshots, and scope.
+
+## Coral Capers authored seam capability (2026-09-06)
+
+`DKC1_WS_WALL_SEAMS=1` is a separate default-off presentation opt-in. It continues two verified faces of one offscreen rock-wall junction and separately verified western-alcove and upper-shaft walls. The west face uses its authored three-row period; the east face and alcove use source-verified donor strips with an identical retained wall cell. Exact source-layout and full junction/donor-byte checks contain each capability; native pixels and guest memory are untouched. WS trace feature bit 16 and `wall_seam_tiles` identify its use. Preserve this environment setting explicitly when replaying its evidence. See `docs/WIDESCREEN_WALL_SEAM.md` for the exact saves, source proof, 16:10/16:9 A/B, Glide-aware original-viewport checks, and missing Coral Capers fresh-entry gate. This does not grant a general capability to replace populated margin art.
+
+## v0.0.9 Mac release opt-in
+
+Escape → Settings → **Aquatic widescreen fixes** persists
+`GraphicsV1.aquatic_fixes` (default 0). On the next launch it supplies all five
+`DKC1_WS_*` presentation flags documented above, without replacing explicit
+individual environment overrides. It does not apply while the pause panel is
+open. Public bundles have no `LSEnvironment`; clean-user defaults remain off.
+`DKC1_BUILD_DIR` optionally selects an isolated `build_macos.sh` output tree
+so packaging does not remove a running playtest bundle.

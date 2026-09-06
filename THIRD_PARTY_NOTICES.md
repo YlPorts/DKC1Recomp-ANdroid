@@ -16,6 +16,9 @@ Users must provide the supported ROM themselves.
   revision `c2080f40469c716923f550706509a0d354229841`. The disassembly itself,
   its comments, and ROM-derived assembly are not copied into this repository.
 - Portions of the host integration follow the MIT-licensed DKC2Recomp project.
+  This includes the CRT/filter models, translated Reconstruct/CRT shaders,
+  audio drift model, and input/refresh/rewind designs. The DKC2 license notice
+  is reproduced below. The native AppKit/Metal integration is DKC1 host code.
 - The optional Baby Kong mod's source-only Kiddy frame map records names,
   addresses, sizes, and palette location derived from the GPL-3 H4v0c21
   DKC3 disassembly at revision
@@ -32,3 +35,27 @@ Users must provide the supported ROM themselves.
 
 Donkey Kong Country, Nintendo, Rare, and related names and trademarks belong
 to their respective owners. This is an unofficial noncommercial fan project.
+
+## DKC2Recomp host and graphics code
+
+MIT License
+
+Copyright (c) 2026 DKC2 Port contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

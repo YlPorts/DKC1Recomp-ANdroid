@@ -931,7 +931,7 @@ class WidescreenRuntimeContractTests(unittest.TestCase):
         self.assertIn("kSnesPixelAspectNumerator = 7", host)
         self.assertIn("kSnesPixelAspectDenominator = 6", host)
         self.assertIn("static int PresentationWidth(void)", host)
-        self.assertIn("PresentationWidth() * kWindowScale", host)
+        self.assertIn("PresentationWidth() * s_graphics.window_scale", host)
         self.assertIn(
             'SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0")', host)
         self.assertLess(host.index("SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES"),
@@ -972,7 +972,7 @@ class WidescreenRuntimeContractTests(unittest.TestCase):
             encoding="utf-8")
         bridge = (ROOT / "runner" / "macos_file_picker.m").read_text(
             encoding="utf-8")
-        self.assertIn('AddSubmenu(view, @"Full Screen Scaling"', bridge)
+        self.assertIn('AddSubmenu(view, @"Upscaler"', bridge)
         self.assertIn('@"Smooth (Linear)"', bridge)
         self.assertIn('@"Sharp Bilinear"', bridge)
         self.assertIn('@"Pixel Sharp (Nearest)"', bridge)
@@ -1022,8 +1022,9 @@ class WidescreenRuntimeContractTests(unittest.TestCase):
         self.assertIn("<CAMetalDisplayLinkDelegate>", presenter)
         self.assertIn("kDkc1MetalFrameSlots = 3", presenter)
         self.assertIn("count >= 2", presenter)
-        self.assertIn("repeatGoal = interval < (1.0 / 90.0) ? 2u : 1u",
-                      presenter)
+        self.assertIn("Dkc1RefreshObserve", presenter)
+        self.assertIn("Dkc1RefreshAdvance", presenter)
+        self.assertNotIn("RtlRunFrame(", presenter)
         self.assertIn("CAFrameRateRangeMake(rate, rate, rate)", presenter)
         self.assertIn("addPresentedHandler", presenter)
         self.assertIn("presentDrawable:drawable", presenter)
@@ -1155,7 +1156,7 @@ class WidescreenRuntimeContractTests(unittest.TestCase):
         quick_load = source.split("static void QuickLoad", 1)[1].split(
             "static void ExportRepro", 1)[0]
         self.assertLess(quick_load.index("RtlLoadSnapshot"),
-                        quick_load.index("ResetAudioTimeline();"))
+                        quick_load.index("ReconcileHostTimeline();"))
         pause = source.split("key == SDLK_F7", 1)[1].split(
             "key == SDLK_F8", 1)[0]
         self.assertIn("s_reanchor_pacer = 1;", pause)

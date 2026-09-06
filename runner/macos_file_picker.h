@@ -12,6 +12,7 @@ typedef enum Dkc1MacFullscreenScaling {
 
 enum Dkc1MacMenuCommand {
   kDkc1MacMenuQuit = 1,
+  kDkc1MacMenuControls,
   kDkc1MacMenuPause,
   kDkc1MacMenuStep,
   kDkc1MacMenuQuickSave,
@@ -38,6 +39,15 @@ enum Dkc1MacMenuCommand {
   kDkc1MacMenuEdgeBars,
   kDkc1MacMenuEdgeShift,
   kDkc1MacMenuEdgeGlide,
+  kDkc1MacMenuGraphics,
+  kDkc1MacMenuPauseMenu,
+  kDkc1MacMenuUpscalerReconstruct,
+  kDkc1MacMenuDisplayFlat,
+  kDkc1MacMenuDisplayCrt,
+  kDkc1MacMenuScreenRaw,
+  kDkc1MacMenuScreenCrt,
+  kDkc1MacMenuScreenComposite,
+  kDkc1MacMenuScreenTrinitron,
   kDkc1MacMenuCommandCount
 };
 
@@ -71,6 +81,7 @@ void Dkc1MacSetWidescreenEdge(Dkc1EdgePolicy policy);
 /* Installs the native menu bar. Dkc1MacMenuCommand is implemented by the
  * SDL host and receives menu actions on the application's main thread. */
 void Dkc1MacInstallMenu(void);
+void Dkc1MacUpdateGraphicsMenuState(int display,int upscaler,int screen);
 void Dkc1MacUpdateMenuState(int paused, int fullscreen,
                             Dkc1MacFullscreenScaling fullscreen_scaling,
                             Dkc1VideoAspect aspect, Dkc1EdgePolicy edge,

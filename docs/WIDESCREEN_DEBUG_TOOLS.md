@@ -924,3 +924,58 @@ lengths, malformed hex, overlaps, range overflow, and out-of-WRAM endpoints
 disable the watch instead of partially arming it. A 256-row per-frame safety
 limit emits `watch_truncated`; `tools/reverse_watch.py` treats that marker as a
 failed evidence run and asks for narrower ranges.
+
+## Aquatic presentation candidate (2026-09-06)
+
+The independently default-off `DKC1_WS_PIXEL_BOUNDARIES=1`,
+`DKC1_WS_LIVE_SCROLL=1`, and `DKC1_WS_WALL_ADJACENCY=1` backports are documented
+in [the aquatic validation record](WIDESCREEN_AQUATIC_BACKPORTS.md). The trace
+records root `presentation_features` bits 1/2/4 and
+`boundary_adjacency_tiles` (also part of `boundary_continuation_tiles`).
+Headless/layer capture accept `DKC1_ASPECT=16:10` with widescreen enabled.
+Native-edge and scanline-scroll evidence passes for the preserved aquatic
+branches; wall continuation is model-tested only. The complete 40-entrance
+floor remains unpassed because 36 required clean anchors are unavailable.
+
+## September 6 Mac host and cache-boundary additions
+
+- `DKC1_WS_SCROLL_REBASE=1`: default-off, currently calibrated cache rebuild on the exhausted-window frame. WS trace feature bit 8 and `decision.cache_rebase` identify it. `verify_shadow_localization.py` requires a calibrated cold commit for any marked origin change. See `docs/WIDESCREEN_WATER_FLASH.md` and `recipes/croctopus-cache-crossing.json`.
+- Native **Game → Controls and Assist…** exposes source routing, remapping, analog deadzones, and opt-in rewind/3× fast-forward. Default Assist holds: Backspace/Tab or left/right triggers. Game time remains canonical. Rewind memory is capped at 128 MiB; actual history duration depends on serialized-state capacity. See `docs/HOST_ADOPTION_IMPLEMENTATION.md`.
+- `DKC1_ASSIST_TEST_INPUT=<input file>`: default-off Mac-only host-action schedule using the existing hex/repetition format; masks 1=rewind, 2=fast-forward, 4=quick-save, 8=quick-load. It enables Assist only for that run. Save/load actions operate the normal quicksave path; do not use those bits against a tester's only state. `DKC1_ASSIST_TEST_LOG=<path>` optionally records host tick, host/guest frame, pops, and history depth. Gameplay playback stays independent and is abandoned after a rewind/load.
+- `DKC1_PAUSE_AFTER_FRAME=<positive host frame>`: default-off Mac exact-frame pause. Clears gameplay and host-action schedules and stops sound/rumble; preserves the actual submitted pixels for window capture. `DKC1_SAVESTATE_OUTPUT` also works at graceful Mac shutdown. Use private paths, not the user's normal slots.
+- `DKC1_PACING_LOG` adds `audio_ratio`, `audio_fill_average`, and `audio_target_frames`. Canonical production is unchanged; only mixed host PCM is resampled. `DKC1_SCANOUT_LOG` repeat goal 0 means unqualified/non-integer cadence using target timestamps; goals 1–4 are qualified divisors.
+- Flight bundles and post-failure input tails preserve both controllers as six-digit masks. The verifier accepts both historical three-digit and new six-digit masks. Existing bundle schema and hashes remain valid.
+
+## Mac graphics and pause-menu diagnostics (September 6, 2026)
+
+The Metal presenter now supports DKC2 Reconstruct/CRT and four phosphor profiles. Raw WS/plane/state evidence is collected before the color-copy and shader stages. Use Flat + Raw + Nearest for visible native-pixel comparison; other selected effects intentionally change visible RGB. All guest timing and tile-streaming diagnostics remain independent.
+
+`test_macos_graphics` provides standalone GPU checks for native transfer, all modes/presets, cached repeats, and invalidation by changed pixels/settings/viewport. Build with `cmake --build build/macos --target test_macos_graphics` and run `build/macos/test_macos_graphics runner/macos_graphics.metal [existing-output-dir] [binary-P6-input]`. Optional test-only geometry: `DKC1_TEST_SCALE=1..16` and `DKC1_TEST_PIXEL_ASPECT=1`. It returns 77 when no Metal device is available.
+
+For actual-window QA, combine a separate application bundle identifier with `DKC1_USER_DIR=<absolute existing directory>` to isolate preferences and saves respectively. Startup options are `DKC1_DISPLAY`, `DKC1_UPSCALER`, `DKC1_SCREEN`, `DKC1_CRT_PRESET`, and `DKC1_RECONSTRUCT_MODE/STRENGTH/SOFTNESS/SHADING`; the canonical values are cataloged in `.claude/skills/dkc1-tools/TOOLS.md`. Omitted variables use saved `GraphicsV1` settings. Do not set diagnostic input, snapshot, or output paths in a normal app build. See [graphics port evidence and limits](GRAPHICS_OPTIONS_PORT.md).
+
+## Coral Capers populated wall junction (September 6, 2026)
+
+The default-off `DKC1_WS_WALL_SEAMS=1` capability repairs both verified faces of one offscreen junction, with independent source and native-edge containment for each direction. It exposes trace feature bit 16 and optional count `wall_seam_tiles` (trace schema maximum feature mask is now 31). Diagnostics remain inert when disabled. Use raw BG1 plus composite and separate native-center hashes; the defect exists before graphics postprocessing. Exact-state and scrolling acceptance, donor-map proof, and the unfulfilled same-level fresh-entry gate are recorded in [WIDESCREEN_WALL_SEAM.md](WIDESCREEN_WALL_SEAM.md). Replay with the switch explicitly enabled; do not infer its value from the state file.
+
+## Ordinary fine-scroll guard regression (2026-09-06)
+
+`DKC1_WS_SCROLL_REBASE=1` also captures the live native bottom guard row on currently calibrated fine-Y=7 frames, even without an origin change. `decision.cache_rebase` continues to mean an actual cache rebuild. `recipes/coral-bottom-row-guard.json` uses the immutable active Coral root documented in [the camera audit](WIDESCREEN_CAMERA_AUDIT.md); it is an exact-state regression, not a clean-entry recipe. The existing strict snapshot grader detects this terrain miss, and same-frame layer captures localize it to the last scanline. The report also distinguishes static camera/art screening from actual runtime coverage.
+
+The western-alcove case in [WIDESCREEN_WALL_SEAM.md](WIDESCREEN_WALL_SEAM.md) adds a separate source signature under `DKC1_WS_WALL_SEAMS`. For a Glide-biased frame, locate the original viewport at `extra - presentation_bias` before comparing native pixels; the nominal geometric center may contain newly added margin art. Retain nominal trace regions for continuity, but do not mislabel a change outside the cartridge viewport as native corruption. `wall_seam_tiles` includes both earlier junctions and the new alcove.
+
+The upper-shaft follow-up uses the same flag and trace count, with an independent
+36-cell source check. Keep actual camera ranges and boundary-crossing counts
+beside route durations: held inputs can remain blocked for hundreds of frames.
+The documented shaft-return route completes one out-and-back, while its later
+pulses and the attempted lower-alcove connection do not establish more coverage.
+
+## v0.0.9 Mac release opt-in
+
+Escape → Settings → **Aquatic widescreen fixes** persists
+`GraphicsV1.aquatic_fixes` (default 0). On the next launch it supplies all five
+`DKC1_WS_*` presentation flags documented above, without replacing explicit
+individual environment overrides. It does not apply while the pause panel is
+open. Public bundles have no `LSEnvironment`; clean-user defaults remain off.
+`DKC1_BUILD_DIR` optionally selects an isolated `build_macos.sh` output tree
+so packaging does not remove a running playtest bundle.

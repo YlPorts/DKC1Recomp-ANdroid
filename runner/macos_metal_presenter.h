@@ -2,6 +2,7 @@
 #define DKC1_MACOS_METAL_PRESENTER_H
 
 #include "macos_file_picker.h"
+#include "desktop_graphics.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -26,6 +27,10 @@ void Dkc1MacMetalPresenterQueueFrame(
 void Dkc1MacMetalPresenterSetGeometry(int presentation_width, int fullscreen);
 void Dkc1MacMetalPresenterSetScaling(Dkc1MacFullscreenScaling scaling);
 void Dkc1MacMetalPresenterSetActive(int active);
+/* Abandon queued future frames after a timeline change. */
+void Dkc1MacMetalPresenterFlush(void);
 void Dkc1MacMetalPresenterStop(void);
+
+void Dkc1MacMetalPresenterSetGraphics(const Dkc1GraphicsSettings *settings);
 
 #endif

@@ -158,7 +158,55 @@
       "repro": "build/repros/macos-metal-pacing-20260830/final-short-visible*/scanout.jsonl with the immutable Slip-Slide Ride state and vertical-left-right/left-right.inputs",
       "expected": "Each complete 60 Hz source frame is scanned exactly twice on a 120 Hz panel, with approximately 8.333 ms drawable intervals and approximately 16.667 ms physical source transitions; no missing, backward, or coalesced source frames.",
       "first_seen": "2026-08-30",
-      "mitigation_note": "The 2026-08-30 fixed-clock change removed the measured 29-46 ms game-loop stalls. The follow-up native Metal path keeps emulation at that fixed 60 Hz and uses an independent CAMetalDisplayLink, a three-frame immutable queue, one-frame presentation lead, and two 120 Hz draws per source frame. Sharp Bilinear became the fullscreen default, with Smooth and Pixel Sharp retained as explicit choices. Three 780-frame runs remain byte-identical and the presenter reports no producer drops, consumer skips, missing source frames, backward transitions, or starvation. A clean visible sample held 8.333 ms physical intervals and 16.667 ms source transitions, but other current-build visible samples reached approximately 12 ms p99 drawable intervals and approximately 20.5 ms p99 source transitions even while the CPU loop stayed near 16.667 ms. The new dkc1.scanout.v1 trace records actual drawable presentedTime beside camera and BG1-BG3 scroll so the remaining compositor-level variability can be diagnosed without changing game state."
+      "mitigation_note": "The 2026-08-30 fixed-clock change removed the measured 29-46 ms game-loop stalls. The follow-up native Metal path keeps emulation at that fixed 60 Hz and uses an independent CAMetalDisplayLink, a three-frame immutable queue, one-frame presentation lead, and two 120 Hz draws per source frame. Sharp Bilinear became the fullscreen default, with Smooth and Pixel Sharp retained as explicit choices. Three 780-frame runs remain byte-identical and the presenter reports no producer drops, consumer skips, missing source frames, backward transitions, or starvation. A clean visible sample held 8.333 ms physical intervals and 16.667 ms source transitions, but other current-build visible samples reached approximately 12 ms p99 drawable intervals and approximately 20.5 ms p99 source transitions even while the CPU loop stayed near 16.667 ms. The new dkc1.scanout.v1 trace records actual drawable presentedTime beside camera and BG1-BG3 scroll so the remaining compositor-level variability can be diagnosed without changing game state. September 6: adopted eight-observation refresh qualification with a timestamp fallback, keeping the independent fixed 60 Hz producer. The new five-minute run has zero repeat-goal changes (baseline 116 in 30 seconds), but physical scanout still varies and occluded drawables occur. This remains open; see docs/HOST_ADOPTION_IMPLEMENTATION.md."
+    },
+    {
+      "id": "aquatic-shadow-native-boundary",
+      "status": "open",
+      "summary": "Aquatic BG1 shadow chunks overwrite native-edge pixels; an opt-in pixel-boundary/live-scroll candidate removes the measured defect. Wall adjacency remains experimental and whole-game promotion is pending.",
+      "repro": "build/reviews/aquatic-widescreen-20260906/inputs/exact-underwater-live.state; controller-only fresh entry from the preserved map root",
+      "evidence": "docs/WIDESCREEN_AQUATIC_BACKPORTS.md; build/repros/aquatic-backports-20260906/validation-summary.json",
+      "expected": "Preserve every native pixel, align shadow X with the live scanline, and extend only source-proven wall patterns after all promotion gates pass.",
+      "first_seen": "2026-09-06"
+    },
+    {
+      "id": "aquatic-upward-cache-flash",
+      "status": "open",
+      "summary": "Croctopus Chase briefly blacks both margins when upward scrolling leaves the host cache window. The opt-in scroll-rebase candidate now rebuilds the calibrated frame, including the HDMA native guard row; whole-game promotion remains pending.",
+      "repro": "recipes/croctopus-cache-crossing.json from the immutable map root documented in docs/WIDESCREEN_WATER_FLASH.md; exact turn frames 314683 and 314804",
+      "expected": "Keep calibrated scenery visible across cache boundaries without changing the native center, guest state, or the existing cartridge activation gate.",
+      "first_seen": "2026-09-06",
+      "evidence": "docs/WIDESCREEN_WATER_FLASH.md; build/repros/host-adoption-20260906/validation/report.json",
+      "mitigation_note": "DKC1_WS_SCROLL_REBASE=1 enables the candidate. Both upward-boundary flashes disappear in the 420-frame turn route; 342/308-pixel runs repeat three times and all five guest-memory hashes plus accepted-center hashes match the disabled build on turn, supplied-state, and clean-entry routes. Live before/after windows and a 1980-frame fresh-entry traversal are preserved. The complete 40-entrance floor remains unavailable."
+    },
+    {
+      "id": "coral-capers-populated-wall-seam",
+      "status": "open",
+      "summary": "Two supplied Coral Capers states expose opposite faces of a mismatched authored wall junction. Source-verified, default-off margin corrections are available for local playtesting.",
+      "repro": "build/repros/water-seam-20260906/inputs/quicksave.state; frame 34978, mode 3, level $0061, entrance $00BF, camera 943/10113; right-face follow-up: build/repros/water-right-seam-20260906/inputs/quicksave.state, frame 78551, camera 671/10048",
+      "expected": "Continue only the verified offscreen wall pattern, preserving every native-center pixel and guest state; retain source defaults until the fresh-entry promotion gate passes.",
+      "first_seen": "2026-09-06",
+      "mitigation_note": "DKC1_WS_WALL_SEAMS=1 checks the complete original junction and reads correctly phased donor cells from the same wall. Exact A/B changes 2105 left-margin composite pixels; native center, right margin and all guest hashes remain exact. Both aspects pass three-repeat nearby scrolling and native/layer comparisons. The real window is clean with the user graphics settings. Fresh Coral Capers entry is still unverified. See docs/WIDESCREEN_WALL_SEAM.md. The right-facing extension changes 4982 right-margin pixels at 16:10 and 8375 at 16:9; matching donor triples also close the blue gap. Three-repeat routes and native/isolated-layer checks pass, and the original left-seam routes remain exact. The rebuilt normal app is visually verified at the new save. The next ceiling-corner hole at frame 110246/camera 671,9898 is repaired by extending the verified donor range to row 312; explicit 16:10/16:9 occupancy checks pass. Original ripple retained by user choice."
+    },
+    {
+      "id": "aquatic-fine-scroll-bottom-row-gap",
+      "status": "open",
+      "summary": "Ordinary fine-Y=7 scrolling can expose a short strip of BG2 on the last scanline because the native edge tile guard row was captured only during a cache rebase. The local opt-in correction is validated; whole-game promotion remains pending.",
+      "repro": "recipes/coral-bottom-row-guard.json from active Coral root 1eb7355de0dbc3ff8250d526611e0154fe446e590c1c1e43786a57a99e2be316; first miss at relative frame 85, absolute 110691, camera 592/10000",
+      "expected": "Capture the cartridge-authentic native guard row on calibrated fine-Y=7 frames without modifying the native image, guest state, HDMA or activation.",
+      "first_seen": "2026-09-06",
+      "evidence": "docs/WIDESCREEN_CAMERA_AUDIT.md; build/repros/widescreen-camera-audit-20260906/bottom-row/",
+      "mitigation_note": "DKC1_WS_SCROLL_REBASE=1 now covers ordinary fine-scroll crossings as well as rebases. Fifty 360-frame movement branches, each repeated three times, reduce terrain misses from 124 to zero with exact per-frame native/guest hashes. Additional 16:10/native branches and isolated layers repeat exactly; actual app windows were inspected. Transition sentinel passes 34 samples/five boundaries. Four fresh entrances have zero hard failures and four pre-existing investigations; the 40-entrance floor remains 36 anchors short. Normal app updated for next launch while preserving the current user process and save."
+    },
+    {
+      "id": "coral-western-alcove-margin-gaps",
+      "status": "open",
+      "summary": "The western Coral Capers alcove and higher shaft expose right-margin gaps in unused map cells. Separate source-verified local corrections are available; full promotion remains pending.",
+      "repro": "build/repros/water-new-junction-20260906/inputs/quicksave.state; frame 541651, mode 3, level $0061, entrance $00BF, camera 127/9797; higher shaft: build/repros/water-upper-alcove-20260906/inputs/quicksave.state, frame 553153, camera 16/9380",
+      "expected": "Continue only the verified offscreen wall strips while preserving every pixel of the original viewport, including its Glide placement, and all guest state.",
+      "first_seen": "2026-09-06",
+      "evidence": "docs/WIDESCREEN_WALL_SEAM.md; build/repros/water-new-junction-20260906/",
+      "mitigation_note": "DKC1_WS_WALL_SEAMS=1 validates the 64-cell alcove signature plus 26 donor entries before extending the wall. Exact A/B changes 2722/8063 right-side composite pixels at 16:10/16:9; the original 256-pixel image is exact at output X15..270. Both reported empty regions pass full occupancy checks. Six routes at both aspects pass three repeats, with exact native/left pixels and guest hashes. Earlier 50-route and three-save regressions remain exact. The normal app is rebuilt and reopened at the preserved save. The middle marked join matches original ROM terrain and is unchanged. Fresh Coral entry and the complete 40-entrance floor remain unavailable. Higher-shaft follow-up: a separate 36-cell source/guard/donor check continues columns 9..11 at rows 295..298 from matching authored rows 280..282. It closes both reported holes (756/756 and 1620/1620 probe coverage), changes 3342/6640 side pixels, and preserves the entire native image at Glide output X2..257. 22 route/aspect cases pass three repeats with exact original-viewport pixels, guest hashes and audio; the actual shaft climb/return is visually verified. Higher/lower branches reach camera Y8996..10048, but the previous lower-root connection remains blocked. Four earlier saves and all 50 prior routes remain exact. Clean Coral entry and the full capability floor remain unavailable. Normal app rebuilt, signed and reopened at the higher-shaft save; actual window verified and original slot preserved."
     }
   ]
 }

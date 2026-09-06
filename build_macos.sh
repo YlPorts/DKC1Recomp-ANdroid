@@ -7,7 +7,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 repo_dir="$(cd "$(dirname "$0")" && pwd)"
-build_dir="$repo_dir/build/macos"
+build_dir="${DKC1_BUILD_DIR:-$repo_dir/build/macos}"
 rom_path="${1:-${DKC1_ROM:-}}"
 
 for tool in cmake ninja sdl2-config python3; do
@@ -54,6 +54,14 @@ if [[ "$linked_sdl" != "@executable_path/../Frameworks/$sdl_name" ]]; then
   install_name_tool -change "$linked_sdl" \
     "@executable_path/../Frameworks/$sdl_name" "$executable"
 fi
+
+# Retain source and dependency notices in distributable application bundles.
+licenses="$app/Contents/Resources/Licenses"
+mkdir -p "$licenses"
+cp "$repo_dir/LICENSE" "$licenses/DKC1Recomp.txt"
+cp "$repo_dir/THIRD_PARTY_NOTICES.md" "$licenses/THIRD_PARTY_NOTICES.md"
+cp "$repo_dir/snesrecomp/LICENSE" "$licenses/snesrecomp.txt"
+cp "$repo_dir/snesrecomp/THIRD_PARTY_ATTRIBUTION.md" "$licenses/snesrecomp-attribution.md"
 
 codesign --force --sign - "$sdl_bundle"
 codesign --force --deep --sign - "$app"

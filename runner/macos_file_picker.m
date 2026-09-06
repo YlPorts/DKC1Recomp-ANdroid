@@ -241,6 +241,7 @@ void Dkc1MacInstallMenu(void) {
     AddSubmenu(bar, @"DKC1Recomp", app);
 
     NSMenu *game = [[NSMenu alloc] initWithTitle:@"Game"];
+    AddCommand(game, @"Controls and Assist…", kDkc1MacMenuControls, @",", NSEventModifierFlagCommand);
     AddCommand(game, @"Pause", kDkc1MacMenuPause, @"p",
                NSEventModifierFlagCommand);
     AddCommand(game, @"Step One Frame", kDkc1MacMenuStep, @".",
@@ -253,6 +254,7 @@ void Dkc1MacInstallMenu(void) {
     [game addItem:[NSMenuItem separatorItem]];
     AddCommand(game, @"Export Repro Bundle", kDkc1MacMenuExportRepro, @"",
                0);
+    AddCommand(game,@"Pause Menu…",kDkc1MacMenuPauseMenu,@"",0);
     AddSubmenu(bar, @"Game", game);
 
     NSMenu *mods = [[NSMenu alloc] initWithTitle:@"Mods"];
@@ -293,17 +295,29 @@ void Dkc1MacInstallMenu(void) {
     AddCommand(layers, @"Sprites Only", kDkc1MacMenuLayerObj, @"", 0);
 
     NSMenu *view = [[NSMenu alloc] initWithTitle:@"View"];
+    AddCommand(view,@"Graphics Settings…",kDkc1MacMenuGraphics,@"",0);
     AddCommand(view, @"Enter Full Screen", kDkc1MacMenuFullscreen, @"f",
                NSEventModifierFlagControl | NSEventModifierFlagCommand);
     NSMenu *fullscreenScaling =
-        [[NSMenu alloc] initWithTitle:@"Full Screen Scaling"];
+        [[NSMenu alloc] initWithTitle:@"Upscaler"];
     AddCommand(fullscreenScaling, @"Smooth (Linear)",
                kDkc1MacMenuFullscreenSmooth, @"", 0);
     AddCommand(fullscreenScaling, @"Sharp Bilinear",
                kDkc1MacMenuFullscreenSharpBilinear, @"", 0);
     AddCommand(fullscreenScaling, @"Pixel Sharp (Nearest)",
                kDkc1MacMenuFullscreenPixelSharp, @"", 0);
-    AddSubmenu(view, @"Full Screen Scaling", fullscreenScaling);
+    AddCommand(fullscreenScaling,@"Reconstruct",kDkc1MacMenuUpscalerReconstruct,@"",0);
+    AddSubmenu(view, @"Upscaler", fullscreenScaling);
+    NSMenu *display=[[NSMenu alloc] initWithTitle:@"Display"];
+    AddCommand(display,@"Flat Panel",kDkc1MacMenuDisplayFlat,@"",0);
+    AddCommand(display,@"CRT Television",kDkc1MacMenuDisplayCrt,@"",0);
+    AddSubmenu(view,@"Display",display);
+    NSMenu *colors=[[NSMenu alloc] initWithTitle:@"Phosphor Colors"];
+    AddCommand(colors,@"Raw",kDkc1MacMenuScreenRaw,@"",0);
+    AddCommand(colors,@"CRT",kDkc1MacMenuScreenCrt,@"",0);
+    AddCommand(colors,@"Composite",kDkc1MacMenuScreenComposite,@"",0);
+    AddCommand(colors,@"Trinitron",kDkc1MacMenuScreenTrinitron,@"",0);
+    AddSubmenu(view,@"Phosphor Colors",colors);
     [view addItem:[NSMenuItem separatorItem]];
     AddSubmenu(view, @"Aspect Ratio", aspect);
     AddSubmenu(view, @"Level Edge", edge);
@@ -681,4 +695,13 @@ void Dkc1MacSetFullscreenScaling(Dkc1MacFullscreenScaling scaling) {
     [defaults setInteger:scaling forKey:@"DKC1FullscreenScaling"];
     [defaults synchronize];
   }
+}
+
+void Dkc1MacUpdateGraphicsMenuState(int display,int upscaler,int screen) {
+  const int scalers[]={kDkc1MacMenuFullscreenPixelSharp,kDkc1MacMenuFullscreenSmooth,
+    kDkc1MacMenuUpscalerReconstruct,kDkc1MacMenuFullscreenSharpBilinear};
+  for (int i=0;i<4;i++) { s_menu_items[scalers[i]].state=i==upscaler; s_menu_items[scalers[i]].enabled=display==0; }
+  s_menu_items[kDkc1MacMenuDisplayFlat].state=display==0;
+  s_menu_items[kDkc1MacMenuDisplayCrt].state=display==1;
+  for (int i=0;i<4;i++) s_menu_items[kDkc1MacMenuScreenRaw+i].state=i==screen;
 }

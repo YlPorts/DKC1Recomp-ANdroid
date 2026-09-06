@@ -1378,3 +1378,55 @@ Widescreen is not release-ready until all of the following are true:
   complete VBlank later.
 - Do not hide wide/native WRAM divergence under an ignore list before
   classifying the first actor/state difference.
+
+## Aquatic presentation candidate (2026-09-06)
+
+The independently default-off `DKC1_WS_PIXEL_BOUNDARIES=1`,
+`DKC1_WS_LIVE_SCROLL=1`, and `DKC1_WS_WALL_ADJACENCY=1` backports are documented
+in [the aquatic validation record](WIDESCREEN_AQUATIC_BACKPORTS.md). The trace
+records root `presentation_features` bits 1/2/4 and
+`boundary_adjacency_tiles` (also part of `boundary_continuation_tiles`).
+Headless/layer capture accept `DKC1_ASPECT=16:10` with widescreen enabled.
+Native-edge and scanline-scroll evidence passes for the preserved aquatic
+branches; wall continuation is model-tested only. The complete 40-entrance
+floor remains unpassed because 36 required clean anchors are unavailable.
+
+## September 6 host and aquatic follow-up
+
+See [host ports](HOST_ADOPTION_IMPLEMENTATION.md) and [the reproduced water flash](WIDESCREEN_WATER_FLASH.md). The updated separate candidate starts paused with all four presentation switches enabled. Two upward cache crossings are repaired, guest-state hashes remain exact against the disabled policy, and source changes remain uncommitted.
+
+## Coral Capers save follow-up (September 6, 2026)
+
+The user's newer state is **Coral Capers**, `$0061/$00BF`, frame 34978, camera 943/10113. Its left-edge join comes from adjacent authored map regions, not cache history. The narrowly guarded `DKC1_WS_WALL_SEAMS=1` playtest capability uses the same wall's lower three-row pattern and preserves all native pixels/guest hashes. The exact save and two-aspect scrolling pass; same-level fresh entry remains unverified. See [WIDESCREEN_WALL_SEAM.md](WIDESCREEN_WALL_SEAM.md). No source defaults or commits were promoted.
+
+The subsequent right-edge save (frame 78551, camera 671/10048) views the opposite face of that junction. The same opt-in now supplies the matching right-wall interior from verified donor triples, fixing the seam and blue gap. Native/left/guest hashes stay exact; the prior left-seam routes remain unchanged. The normal app is rebuilt and visibly verified at the new save. Same-level fresh entry remains unverified; see the right-facing follow-up in the wall-seam record.
+
+The follow-up hole at frame 110246, camera 671/9898 is the partial ceiling corner in row 312. The verified east-wall range now includes that row and its authored `0007/4005/00D5` continuation. An explicit BG1 occupancy check catches the former blue rectangle; native image and guest hashes stay exact. The user declined removal of the original ripple. See the missing-corner section in WIDESCREEN_WALL_SEAM.md.
+
+## September 6 broader camera audit and bottom-row follow-up
+
+See [WIDESCREEN_CAMERA_AUDIT.md](WIDESCREEN_CAMERA_AUDIT.md). Source screening covers 40 main-level maps and 918 nonempty camera ranges, but only five saved gameplay roots and four clean entrance anchors have runtime coverage. The audit found an ordinary-scroll fine-Y=7 native guard-row miss; the existing default-off rebase option now captures that live row on those calibrated frames. Fifty movement branches pass three repeats with zero terrain misses and exact native/guest hashes. Normal app updated and signed; user process 92526 deliberately remains running on its previous mapped executable until restart. Save/preferences preserved. Full 40-entrance promotion is still unavailable; do not convert static art suspects into blanket wall replacements. Original water ripple remains enabled.
+
+## September 6 western Coral alcove follow-up
+
+The new save at frame 541651/camera 127,9797 exposes two right-side gaps. A separate source-verified alcove capability under `DKC1_WS_WALL_SEAMS` now fills them with matching authored strips. See [the wall-seam report](WIDESCREEN_WALL_SEAM.md). This state has Glide bias: the exact original image is X15..270 in both wide aspects, so use the authentic viewport rather than the nominal center crop as the oracle. Six routes at both aspects repeat three times; original pixels and guest hashes remain exact. The middle marked join matches all 957 original ROM tile entries and is preserved. Normal app rebuilt, signed, reopened at the same quicksave. Fresh-entry/full-floor limitations remain.
+
+## Upper Coral shaft follow-up (2026-09-06)
+
+The next save (`2cad91a6…`, frame 553153, camera 16/9380) exposes two empty
+right-side rectangles above the prior alcove test range. The existing opt-in
+now has a separate 36-cell source-verified shaft capability for rows 295..298,
+columns 9..11. Donor rows 280..282 preserve the exact original edge. Native
+pixels and guest state remain unchanged; the lower capability is unchanged.
+
+Both widescreen modes pass three-repeat layer and movement comparisons,
+including an actual climb and return through the gap. Camera coverage is
+Y8996..10048 across branches; do not count the blocked lower-root connection
+or later blocked shuttle pulses as completed traversals. Earlier 50-route and
+four-save regressions pass. 241 tests pass with one skip; the sentinel passes
+39 samples/six boundaries. Clean Coral entry/full 40-entrance coverage remain
+unavailable. See `docs/WIDESCREEN_WALL_SEAM.md` and
+`build/repros/water-upper-alcove-20260906/` for scripts, raw/visible evidence,
+identities and remaining limits. Changes remain uncommitted.
+
+Normal app delivery is complete: rebuilt/signed, reopened at the preserved higher-shaft save, and visually verified. See `candidate/normal-app-window.jpg` and `final-manifest.json` in the evidence directory.

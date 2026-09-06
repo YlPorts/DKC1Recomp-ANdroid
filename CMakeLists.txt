@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(dkc1_port
-    VERSION 0.0.8
+    VERSION 0.0.9
     DESCRIPTION "Native PC recompilation of Donkey Kong Country"
     LANGUAGES C)
 
@@ -98,6 +98,11 @@ target_link_libraries(dkc1_snesrecomp_headless PRIVATE
 
 if(APPLE)
     enable_language(OBJC)
+    add_executable(test_macos_graphics tests/test_macos_graphics.m
+        runner/macos_graphics.m runner/desktop_graphics.c runner/desktop_crt.c)
+    target_include_directories(test_macos_graphics PRIVATE runner)
+    target_link_libraries(test_macos_graphics PRIVATE "-framework Foundation" "-framework Metal")
+
     if(NOT SNESRECOMP_SDL_BACKEND STREQUAL "SDL2")
         message(FATAL_ERROR
             "The DKC1 macOS frontend currently requires "
@@ -112,9 +117,22 @@ if(APPLE)
         runner/headless_host.c
         runner/dkc1_haptics.c
         runner/dkc1_msu1.c
+        runner/desktop_audio_rate.c
+        runner/desktop_rewind.c
+        runner/desktop_input.c
+        runner/desktop_refresh.c
+        runner/desktop_crt.c
+        runner/desktop_filter.c
+        runner/desktop_graphics.c
+        runner/macos_graphics.m
+        runner/macos_graphics.metal
+        runner/macos_pause_menu.m
+        runner/macos_controls.m
         runner/sdl_host.c
         runner/macos_metal_presenter.m
         runner/macos_file_picker.m)
+    set_source_files_properties(runner/macos_graphics.metal PROPERTIES
+        HEADER_FILE_ONLY TRUE MACOSX_PACKAGE_LOCATION "Resources")
     set_source_files_properties(assets/macos/DKC1Recomp.icns PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources")
     target_include_directories(dkc1_macos PRIVATE
