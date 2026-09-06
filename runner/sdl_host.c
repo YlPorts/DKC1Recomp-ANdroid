@@ -1,4 +1,4 @@
-/* Native macOS SDL2 frontend for DKC1Recomp.
+/* Shared macOS/Windows SDL2 frontend for DKC1Recomp.
  *
  * The recompiled cartridge/runtime stays identical to the Win32 and headless
  * hosts. This file owns only host presentation, input, queued audio, timing,
@@ -32,19 +32,27 @@
 #include "snes/snes.h"
 
 #include <SDL.h>
+#ifdef _WIN32
+#undef HIBYTE
+#endif
 #include <SDL_syswm.h>
 
 #include <float.h>
 #include <limits.h>
+#ifdef _WIN32
+#include "windows_compat.h"
+#include "windows_platform.h"
+#else
 #include <mach/mach_time.h>
 #include <pthread.h>
+#include <unistd.h>
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #ifndef DKC1_BUILD_COMMIT
 #define DKC1_BUILD_COMMIT "untracked"
@@ -563,13 +571,17 @@ static int PacingLogWriteHeader(Dkc1PacingLog *log,
       ? 1.0 / display->callback_interval
       : kHostPresentationFramesPerSecond;
   fprintf(log->stream,
-          "{\"schema\":\"dkc1.pacing.v3\",\"platform\":\"macos\","
+          "{\"schema\":\"dkc1.pacing.v3\",\"platform\":\"%s\","
           "\"refresh_hz\":%.9f,\"display_hz\":%.9f,"
           "\"clock_source\":\"%s\",\"submit_lead_ms\":%.4f,"
           "\"audio_preroll\":%u,\"audio_ring_start_frames\":%u,"
           "\"test_stall_frame\":%ld,\"test_stall_ms\":%u}\n",
-          refresh_hz, refresh_hz,
+#ifdef _WIN32
+          "windows", refresh_hz, refresh_hz, "QueryPerformanceCounter",
+#else
+          "macos", refresh_hz, refresh_hz,
           s_display_link_active ? "CADisplayLink" : "mach_absolute_time",
+#endif
           kMacSubmitLeadSeconds * 1000.0,
           s_audio_preroll_blocks, s_audio_ring_start_threshold,
           log->test_stall_frame, log->test_stall_ms);
@@ -899,6 +911,9 @@ static int PresentationWidth(void) {
 }
 
 static void ApplyPresentationGeometry(void) {
+#ifdef _WIN32
+  return; /* OpenGL fits the live drawable each frame, preserving SNES PAR. */
+#endif
   s_presentation_output_width = 0;
   s_presentation_output_height = 0;
   if (s_metal_presenter_active) {
@@ -947,9 +962,18 @@ static bool InitVideo(void) {
   s_window = SDL_CreateWindow(
       "DKC1Recomp", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
       window_width, window_height,
-      SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
+      SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE
+#ifdef _WIN32
+      | SDL_WINDOW_OPENGL
+      | (EnvironmentEnabled("DKC1_SMOKE_TEST_HIDDEN") ? SDL_WINDOW_HIDDEN : 0)
+#endif
+      );
   if (!s_window)
     return false;
+#ifdef _WIN32
+  Dkc1WindowsAttach(s_window);
+  return Dkc1WindowsGraphicsInit(s_window);
+#endif
 
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
   /* The fixed Mach clock is the default and sole presentation authority.
@@ -1001,6 +1025,9 @@ static bool InitVideo(void) {
 }
 
 static void InitDisplayLink(void) {
+#ifdef _WIN32
+  return; /* QPC owns emulation cadence; Windows uses the OpenGL presenter. */
+#else
   SDL_SysWMinfo window_info;
   SDL_VERSION(&window_info.version);
   const int have_native_window =
@@ -1054,12 +1081,18 @@ static void InitDisplayLink(void) {
     fprintf(stderr, "[display-authority] display_link=%d renderer_vsync=%d\n",
             s_display_link_active, s_renderer_vsync);
   }
+#endif
 }
 
 static void PreparePresentation(void) {
   const uint8_t *display=Dkc1DesktopColorFilterApply(&s_color_filter,s_pixels,
       s_display_pixels,(size_t)s_width*kDkc1VideoHeight);
   if (!display) display=s_pixels;
+#ifdef _WIN32
+  Dkc1WindowsGraphicsDraw((const uint32_t *)display,s_width,kDkc1VideoHeight,
+                         PresentationWidth(),&s_graphics);
+  return;
+#endif
   if (s_metal_presenter_active) {
     Dkc1MacPresentationFrameInfo info = {
       .host_frame = s_host_frame,
@@ -1108,6 +1141,10 @@ static void PreparePresentation(void) {
 }
 
 static void SubmitPresentation(void) {
+#ifdef _WIN32
+  Dkc1WindowsGraphicsSwap();
+  return;
+#endif
   if (!s_metal_presenter_active)
     SDL_RenderPresent(s_renderer);
 }
@@ -1597,6 +1634,7 @@ static void SetAspectMode(Dkc1VideoAspect requested) {
   const int old_width = s_width;
   Dkc1VideoSetAspect(requested);
   const int new_width = Dkc1VideoWidth();
+#ifndef _WIN32
   SDL_Texture *new_texture = SDL_CreateTexture(
       s_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
       new_width, kDkc1VideoHeight);
@@ -1608,6 +1646,7 @@ static void SetAspectMode(Dkc1VideoAspect requested) {
     return;
   }
   SDL_SetTextureBlendMode(new_texture, SDL_BLENDMODE_NONE);
+#endif
 
   static uint8_t remapped[kDkc1VideoWidescreenWidth *
                           kDkc1VideoHeight * 4];
@@ -1623,8 +1662,10 @@ static void SetAspectMode(Dkc1VideoAspect requested) {
   memcpy(s_pixels, remapped,
          (size_t)new_width * kDkc1VideoHeight * 4);
 
+#ifndef _WIN32
   SDL_DestroyTexture(s_texture);
   s_texture = new_texture;
+#endif
   s_width = new_width;
   s_graphics.aspect=requested; Dkc1MacSaveGraphics(&s_graphics);
   Dkc1BeginDrawing(s_pixels, (size_t)s_width * 4);
@@ -1698,10 +1739,12 @@ void Dkc1MacAssistEnabled(int enabled) {
 
 void Dkc1MacApplyGraphics(Dkc1GraphicsSettings *settings) {
   Dkc1GraphicsSettings next=*settings; Dkc1GraphicsClamp(&next);
+#ifndef _WIN32
   if (!s_metal_presenter_active && (next.display || next.upscaler==kDkc1UpscalerReconstruct)) {
     next.display=0; next.upscaler=kDkc1UpscalerNearest;
     snprintf(s_status,sizeof s_status,"Reconstruct and CRT require the Metal presenter.");
   }
+#endif
   if (next.screen!=s_graphics.screen && !Dkc1DesktopColorFilterInit(&s_color_filter,next.screen))
     next.screen=s_graphics.screen;
   int resize=next.window_scale!=s_graphics.window_scale;
@@ -1743,7 +1786,13 @@ static void OpenPauseMenu(int graphics_page) {
   s_graphics.fullscreen=s_fullscreen;
   // Discard older packets so the menu rests on the latest completed image.
   Dkc1MacMetalPresenterFlush(); Present(); UpdateTitle();
-  int resume=Dkc1MacShowPauseMenu(window.info.cocoa.window,&s_graphics,&s_controls,graphics_page);
+  int resume=Dkc1MacShowPauseMenu(
+#ifdef _WIN32
+      window.info.win.window,
+#else
+      window.info.cocoa.window,
+#endif
+      &s_graphics,&s_controls,graphics_page);
   s_paused=resume ? 0 : was_paused; ResetAudioTimeline();
   s_host_actions=s_previous_host_actions=0; s_input_release_gate=1;
   s_reanchor_pacer=1;
@@ -1936,8 +1985,14 @@ void Dkc1MacMenuCommand(int command) {
 }
 
 static void PollEvents(void) {
+#ifdef _WIN32
+  Dkc1WindowsEvent(NULL);
+#endif
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
+#ifdef _WIN32
+    Dkc1WindowsEvent(&event);
+#endif
     switch (event.type) {
       case SDL_QUIT:
         s_running = 0;
@@ -1977,6 +2032,10 @@ static void PollEvents(void) {
 }
 
 static void Cleanup(uint8_t *rom) {
+#ifdef _WIN32
+  Dkc1WindowsDetach();
+  Dkc1WindowsGraphicsClose();
+#endif
   char error[256];
   if (!Dkc1WramDumpClose(&s_wram_dump, error, sizeof error))
     fprintf(stderr, "wram_dump: %s\n", error);
@@ -2012,7 +2071,11 @@ static void Cleanup(uint8_t *rom) {
 
 int main(int argc, char **argv) {
   SDL_SetMainReady();
+#ifndef _WIN32
   (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+#else
+  SDL_SetHint("SDL_WINDOWS_DPI_AWARENESS","permonitorv2");
+#endif
   /* A native macOS fullscreen Space constrains SDL to the panel's inset safe
    * area (3949x2464 on the target 4112x2658 MacBook display). Set this before
    * the Cocoa video backend initializes so FULLSCREEN_DESKTOP uses the full
@@ -2022,6 +2085,17 @@ int main(int argc, char **argv) {
     fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
     return 3;
   }
+#ifdef _WIN32
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_CORE);
+  if (argc>1 && strcmp(argv[1],"--graphics-test")==0) {
+    int result=Dkc1WindowsGraphicsTest(); SDL_Quit(); return result;
+  }
+  if (argc==3 && strcmp(argv[1],"--platform-test")==0) {
+    int result=Dkc1WindowsPlatformTest(argv[2]); SDL_Quit(); return result;
+  }
+#endif
 
   char rom_path[PATH_MAX] = {0};
   if (!ResolveRomPath(argc, argv, rom_path)) {
@@ -2467,6 +2541,7 @@ int main(int argc, char **argv) {
     if (s_smoke_test_frames > 0 && s_host_frame >= s_smoke_test_frames) {
       snprintf(s_status, sizeof s_status,
                "smoke test complete at frame %ld", s_host_frame);
+      fprintf(stderr,"[smoke] complete host_frame=%ld\n",s_host_frame);
       UpdateTitle();
       s_running = 0;
     }

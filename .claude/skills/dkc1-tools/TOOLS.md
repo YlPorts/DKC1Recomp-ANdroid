@@ -391,6 +391,23 @@ the paused local candidate bundle.
 
 `DKC1_WS_WALL_SEAMS=1` is a separate default-off presentation opt-in. It continues two verified faces of one offscreen rock-wall junction and separately verified western-alcove and upper-shaft walls. The west face uses its authored three-row period; the east face and alcove use source-verified donor strips with an identical retained wall cell. Exact source-layout and full junction/donor-byte checks contain each capability; native pixels and guest memory are untouched. WS trace feature bit 16 and `wall_seam_tiles` identify its use. Preserve this environment setting explicitly when replaying its evidence. See `docs/WIDESCREEN_WALL_SEAM.md` for the exact saves, source proof, 16:10/16:9 A/B, Glide-aware original-viewport checks, and missing Coral Capers fresh-entry gate. This does not grant a general capability to replace populated margin art.
 
+## Windows SDL host validation (v0.0.10)
+
+`build_windows.ps1 -Rom <private-ROM>` builds the Windows SDL/GL host without
+replacing the legacy Win32 or Mac hosts. CTest runs `windows_graphics`,
+`windows_platform`, and `windows_music`. `DKC1Recomp.exe --graphics-test` needs
+no ROM; `--platform-test <existing private directory>` creates a fresh synthetic
+settings INI. The music test uses synthetic ZIP/PCM data. None creates game art.
+
+`DKC1_SMOKE_TEST_HIDDEN=1` hides only the Windows SDL smoke window.
+`DKC1_SMOKE_TEST_FRAMES=<positive count>` exits gracefully with
+`[smoke] complete host_frame=N`. Existing graphics overrides, startup input-only
+routes, exact-frame pause, final snapshot, and Assist schedules work on Windows
+too. An isolated existing `DKC1_USER_DIR` redirects both Windows preferences and
+states. Never use a tester's only slot. Windows pacing headers identify
+`platform=windows` and `clock_source=QueryPerformanceCounter`, not Metal scanout.
+See `docs/WINDOWS_RELEASE.md` for commands and verification limits.
+
 ## v0.0.9 Mac release opt-in
 
 Escape → Settings → **Aquatic widescreen fixes** persists

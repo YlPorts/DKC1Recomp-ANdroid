@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(dkc1_port
-    VERSION 0.0.9
+    VERSION 0.0.10
     DESCRIPTION "Native PC recompilation of Donkey Kong Country"
     LANGUAGES C)
 
@@ -19,10 +19,31 @@ if(NOT DKC1_BUILD_COMMIT)
     set(DKC1_BUILD_COMMIT "nogit")
 endif()
 
+if(WIN32)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    include(FetchContent)
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(SDL2 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG c98c4fbff6d8f3016a3ce6685bf8f43433c3efcc)
+    FetchContent_MakeAvailable(SDL2)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(INSTALL_PROJECT OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(miniz GIT_REPOSITORY https://github.com/richgel999/miniz.git
+        GIT_TAG 293d4db1b7d0ffee9756d035b9ac6f7431ef8492)
+    FetchContent_MakeAvailable(miniz)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/windows_shaders.h
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_windows_shaders.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/runner/macos_graphics.metal
+            ${CMAKE_CURRENT_BINARY_DIR}/windows_shaders.h
+        DEPENDS scripts/generate_windows_shaders.py runner/macos_graphics.metal VERBATIM)
+endif()
+
 if(NOT DEFINED SNESRECOMP_ROOT)
     set(SNESRECOMP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/snesrecomp)
 endif()
-if(APPLE AND NOT DEFINED SNESRECOMP_SDL_BACKEND)
+if((APPLE OR WIN32) AND NOT DEFINED SNESRECOMP_SDL_BACKEND)
     # The DKC1 macOS frontend currently uses SDL2's queued-audio API. Keep
     # this project on the engine's explicit compatibility backend until its
     # SDL3 audio-stream equivalent is implemented and validated.
@@ -164,4 +185,41 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO")
+endif()
+
+if(WIN32)
+    add_executable(dkc1_windows ${DKC1_ENGINE_SOURCES} ${DKC1_SNESRECOMP_GEN_SOURCES}
+        ${DKC1_RUNNER_SOURCES} runner/headless_host.c runner/sdl_host.c
+        runner/dkc1_haptics.c runner/dkc1_msu1.c runner/desktop_audio_rate.c
+        runner/desktop_rewind.c runner/desktop_input.c runner/desktop_refresh.c
+        runner/desktop_crt.c runner/desktop_filter.c runner/desktop_graphics.c
+        runner/windows_platform.c runner/windows_graphics.c runner/windows_music_pack.c
+        ${CMAKE_CURRENT_BINARY_DIR}/windows_shaders.h)
+    target_include_directories(dkc1_windows PRIVATE runner recomp
+        ${SNESRECOMP_RUNNER_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
+    target_compile_definitions(dkc1_windows PRIVATE SDL_MAIN_HANDLED
+        SNESRECOMP_TRACE=0 SNESRECOMP_REVERSE_DEBUG=0
+        SNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1 SYSTEM_VOLUME_MIXER_AVAILABLE=0
+        _CRT_SECURE_NO_WARNINGS DKC1_BUILD_COMMIT="${DKC1_BUILD_COMMIT}"
+        DKC1_BUILD_CONFIG="windows-${PROJECT_VERSION}")
+    target_link_libraries(dkc1_windows PRIVATE ${SNESRECOMP_RUNNER_LIBRARIES}
+        SDL2::SDL2 miniz opengl32 dwmapi comctl32 comdlg32 shell32 ole32 uuid gdi32)
+    set_target_properties(dkc1_windows PROPERTIES OUTPUT_NAME DKC1Recomp WIN32_EXECUTABLE TRUE)
+    target_link_options(dkc1_windows PRIVATE /ENTRY:mainCRTStartup)
+    add_custom_command(TARGET dkc1_windows POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2>
+            $<TARGET_FILE_DIR:dkc1_windows>)
+    enable_testing()
+    add_test(NAME windows_graphics COMMAND dkc1_windows --graphics-test)
+    set_tests_properties(windows_graphics PROPERTIES TIMEOUT 60)
+    add_executable(test_windows_music tests/test_windows_music.c
+        runner/windows_music_pack.c runner/dkc1_msu1.c)
+    target_include_directories(test_windows_music PRIVATE runner)
+    target_compile_definitions(test_windows_music PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(test_windows_music PRIVATE miniz ole32)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/music-test)
+    add_test(NAME windows_music COMMAND test_windows_music ${CMAKE_CURRENT_BINARY_DIR}/music-test)
+    add_test(NAME windows_platform COMMAND dkc1_windows --platform-test ${CMAKE_CURRENT_BINARY_DIR}/music-test)
+    set_source_files_properties(runner/windows_platform.c runner/windows_graphics.c
+        runner/windows_music_pack.c PROPERTIES COMPILE_OPTIONS "/W4;/WX")
 endif()

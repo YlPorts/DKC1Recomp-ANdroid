@@ -4,6 +4,10 @@ DKC1Recomp does not contain or distribute a Donkey Kong Country ROM, generated
 ROM-derived source, save states, extracted game assets, screenshots, or audio.
 Users must provide the supported ROM themselves.
 
+Windows adds unmodified SDL 2.30.9 (zlib) and miniz 3.0.2 (MIT).
+Exact revisions, uses and complete license texts are recorded under
+[`third_party/windows/`](third_party/windows/README.md).
+
 - `snesrecomp` is pinned as a Git submodule. Its source is distributed under
   the PolyForm Noncommercial License 1.0.0 and carries its own third-party
   notices. The project fork exists to retain the host-only widescreen runtime

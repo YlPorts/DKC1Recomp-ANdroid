@@ -12,7 +12,12 @@ continuous audio, and an opt-in 342x224 widescreen presentation path. See `docs/
 chronological bring-up record and `docs/WIDESCREEN.md` for the widescreen
 architecture, ported SuperZSNES findings, validation, and limitations.
 
+Windows releases now include the Mac host's graphics, CRT/reconstruction,
+16:10/16:9, remapping, Assist, music and mod controls in a dark native menu and
+settings panel. See [Windows build, features and validation](docs/WINDOWS_RELEASE.md).
+
 ## Why this game is a strong recomp candidate
+
 
 Unlike most bring-ups, DKC1 does not need blind code discovery: the
 [Yoshifanatic1 DKC1 disassembly](https://github.com/Yoshifanatic1/Donkey-Kong-Country-1-Disassembly)

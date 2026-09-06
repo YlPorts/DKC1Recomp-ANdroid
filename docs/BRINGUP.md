@@ -1,5 +1,27 @@
 # DKC1 bring-up log
 
+## Windows v0.0.10 host parity
+
+The legacy Windows frontend did not expose the Mac v0.0.9 graphics and controls
+work. Added a CMake SDL/OpenGL Windows release target sharing the current host
+models, with dark native menus, all 23 graphics fields, input/Assist remapping,
+music packs and Baby Kong. Preserved every Mac Objective-C/Metal source and
+the pinned engine. No cartridge, widescreen capability or dispatch change.
+
+QA found and corrected a host-settings alias: editing the live struct before
+Apply hid color/audio/scale changes from its old/new comparison. The Windows
+panel now owns a draft, matching Mac behavior. Native layout also scales with
+monitor DPI so labels and controls do not clip. GPU shaders derive from the
+existing Metal arithmetic; Windows-specific clocks and MSU mapping replace
+platform calls, not game timing.
+
+Build/public/native tests and nine private boot replays pass; a fresh input-only
+Jungle Hijinxs route reached gameplay in 7,332 startup frames and the real
+window was inspected. Detailed provenance, hashes, commands and unverified
+hardware/full-game scope are in `docs/WINDOWS_RELEASE.md`. Generated sources,
+ROMs, private states, logs and release artifacts stay under ignored build
+directories or external user paths. The paired Mac v0.0.9 ZIP remains unchanged.
+
 ## 2026-08-15 â€” repo created, first generation
 
 - Scaffolded from the DKC2Recomp layout; `snesrecomp` pinned as a submodule at

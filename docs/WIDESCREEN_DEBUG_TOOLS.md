@@ -1,5 +1,10 @@
 # Widescreen debug tooling plan
 
+Windows v0.0.10 exposes the shared SDL host diagnostics and three ROM-free
+CTest targets. See the Windows section of the canonical tool catalog and
+[`WINDOWS_RELEASE.md`](WINDOWS_RELEASE.md). This does not promote a new
+widescreen capability or change the 40-entrance gate.
+
 > **This is the historical build-out plan and session chronicle.** For
 > the current symptom-to-fix workflow with the finished tool suite,
 > start at **`docs/WIDESCREEN_PLAYBOOK.md`**; the tool reference is

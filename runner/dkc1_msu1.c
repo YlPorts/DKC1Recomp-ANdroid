@@ -7,9 +7,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#define open(path, flags) _open(path, (flags) | _O_BINARY)
+#define close _close
+#define fstat _fstat64
+#define stat _stat64
+#define PROT_READ 0
+#define MAP_PRIVATE 0
+#define MAP_FAILED ((void *)-1)
+static void *mmap(void *address,size_t size,int protection,int flags,int fd,int offset) {
+  (void)address; (void)protection; (void)flags; (void)offset;
+  HANDLE mapping=CreateFileMappingW((HANDLE)_get_osfhandle(fd),NULL,PAGE_READONLY,0,0,NULL);
+  if (!mapping) return MAP_FAILED;
+  void *view=MapViewOfFile(mapping,FILE_MAP_READ,0,0,size);
+  CloseHandle(mapping); return view ? view : MAP_FAILED;
+}
+static int munmap(void *address,size_t size) {
+  (void)size; return UnmapViewOfFile(address) ? 0 : -1;
+}
+#else
+#include <sys/mman.h>
 #include <unistd.h>
+#endif
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
