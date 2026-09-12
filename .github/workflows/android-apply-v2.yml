@@ -2,7 +2,7 @@ name: Apply Android v0.2 source patch
 on:
   push:
     branches: ['android/initial-port']
-    paths: ['ci/android-v2-source.patch']
+    paths: ['ci/android-v2-source.patch', '.github/workflows/android-apply-v2.yml']
 permissions:
   contents: write
 jobs:
