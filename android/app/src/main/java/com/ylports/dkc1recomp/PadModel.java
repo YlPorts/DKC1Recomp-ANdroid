@@ -10,7 +10,8 @@ public final class PadModel {
     public static final class Button {
         public final String label;
         public final int mask;
-        public final float x, y, radius;
+        public float x, y;
+        public final float radius;
         Button(String label, int mask, float x, float y, float radius) {
             this.label=label; this.mask=mask; this.x=x; this.y=y; this.radius=radius;
         }
@@ -38,6 +39,10 @@ public final class PadModel {
             new Button("START", START, width/2f+37*scale, height-48*scale, 34*scale),
             new Button("II", MENU, width-46*scale, 53*scale, 29*scale)
         };
+    }
+    public Button buttonAt(float x,float y) {
+        for (Button b:buttons) if (b.contains(x,y)) return b;
+        return null;
     }
     public int hit(float x, float y) {
         if (Float.isNaN(x) || Float.isInfinite(x) || Float.isNaN(y) || Float.isInfinite(y)) return 0;
