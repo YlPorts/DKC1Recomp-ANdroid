@@ -1,0 +1,74 @@
+--- a/android/native/android_host.c
++++ b/android/native/android_host.c
+@@ -1,4 +1,4 @@
+-/* DKC1Recomp Android frontend, v0.1.0-dev.
++/* DKC1Recomp Android frontend, v0.2.0-dev.
+  * This host calls the real upstream game/runtime. It contains no replacement
+  * emulator, game stubs, generated cartridge code, or bundled ROM data.
+  * All game, audio producer, snapshot and SRAM operations run on SDL_main's
+@@ -41,7 +41,8 @@
+ static jobject s_activity;
+ static jmethodID s_notice_method, s_menu_method;
+ static int s_running=1, s_core_ready, s_width, s_need_texture=1, s_ready_for_present;
+-static uint8_t s_pixels[kDkc1VideoWidescreenWidth*kDkc1VideoHeight*4];
++enum { ANDROID_ULTRAWIDE_EXTRA=96, ANDROID_MAX_WIDTH=256+2*ANDROID_ULTRAWIDE_EXTRA };
++static uint8_t s_pixels[ANDROID_MAX_WIDTH*kDkc1VideoHeight*4];
+ static uint8_t *s_last_sram;
+ static size_t s_last_sram_size;
+ static int s_sram_persisted, s_sram_writable=1, s_failed;
+@@ -369,7 +370,7 @@
+     (void)rename("android.log","android.log.1");
+   (void)freopen("android.log","a",stderr);setvbuf(stderr,NULL,_IONBF,0);
+   (void)unlink("last-error.txt");
+-  fprintf(stderr,"\n[start] android-0.1.0-dev base=cb4dae77 arm64 aspect=%s\n",aspect?aspect:"4:3");
++  fprintf(stderr,"\n[start] android-0.2.0-dev base=cb4dae77 arm64 aspect=%s\n",aspect?aspect:"4:3");
+   /* Keep speculative upstream widescreen switches off. Never weaken ROM verification. */
+   (void)unsetenv("DKC1_ALLOW_ROM_SHA256");
+   (void)setenv("DKC1_ENABLE_EXPERIMENTAL_CARTRIDGE_WIDENING","0",1);
+@@ -384,13 +385,20 @@
+   SDL_AddEventWatch(EventWatch,NULL);BindJava();
+   char error[256];rom=Dkc1ReadVerifiedRom(rom_path,&rom_size,error,sizeof error);
+   if(!rom){Failure(error);result=2;goto cleanup;}
+-  Dkc1VideoSetAspect(aspect&&!strcmp(aspect,"16:9")?kDkc1VideoAspect16x9:
++  const int ultrawide=aspect&&!strcmp(aspect,"21:9");
++  Dkc1VideoSetAspect(ultrawide?kDkc1VideoAspect16x9:
++    aspect&&!strcmp(aspect,"16:9")?kDkc1VideoAspect16x9:
+     aspect&&!strcmp(aspect,"16:10")?kDkc1VideoAspect16x10:kDkc1VideoAspectNative);
++  /* Android-only experimental 21:9: the pinned PPU has a proven 96-pixel
++   * per-side backing budget. Keep the stock 16:9 promotion path, then widen
++   * only the host presentation budget; cartridge widening remains disabled. */
++  if(ultrawide)g_ws_extra=ANDROID_ULTRAWIDE_EXTRA;
+   Dkc1VideoSetRom(rom,rom_size);RtlRegisterGame(Dkc1GameInfo());
+   if(!SnesInit(rom,(int)rom_size)){Failure("El nucleo rechazo la ROM verificada.");result=4;goto cleanup;}
+   s_core_ready=1;LoadSram();
+   if(s_failed){result=6;goto cleanup;}
+-  s_snapshot=Dkc1VideoGetAspect()==kDkc1VideoAspect16x9?"quicksave-16x9.state":
++  s_snapshot=ultrawide?"quicksave-21x9.state":
++    Dkc1VideoGetAspect()==kDkc1VideoAspect16x9?"quicksave-16x9.state":
+     Dkc1VideoGetAspect()==kDkc1VideoAspect16x10?"quicksave-16x10.state":"quicksave-4x3.state";
+   s_width=Dkc1VideoWidth();Dkc1BeginDrawing(s_pixels,(size_t)s_width*4);
+   if(!InitVideo()){Failure(SDL_GetError());result=3;goto cleanup;}
+--- a/android/app/build.gradle
++++ b/android/app/build.gradle
+@@ -8,8 +8,8 @@
+         applicationId 'com.ylports.dkc1recomp'
+         minSdk 23
+         targetSdk 35
+-        versionCode 1
+-        versionName '0.1.0-dev'
++        versionCode 2
++        versionName '0.2.0-dev'
+         ndk { abiFilters 'arm64-v8a' }
+         externalNativeBuild {
+             cmake { arguments '-DANDROID_STL=c++_static'; targets 'main', 'SDL2' }
+--- a/android/native/CMakeLists.txt
++++ b/android/native/CMakeLists.txt
+@@ -58,7 +58,7 @@
+ target_compile_definitions(main PRIVATE SNESRECOMP_SDL3=0 SNESRECOMP_TRACE=0
+   SNESRECOMP_REVERSE_DEBUG=0 SNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1
+   SYSTEM_VOLUME_MIXER_AVAILABLE=0 _POSIX_C_SOURCE=200809L
+-  DKC1_BUILD_COMMIT="cb4dae77" DKC1_BUILD_CONFIG="android-0.1.0-dev")
++  DKC1_BUILD_COMMIT="cb4dae77" DKC1_BUILD_CONFIG="android-0.2.0-dev")
+ # The upstream runtime performs typed accesses to byte-backed guest memory.
+ target_compile_options(main PRIVATE -fno-strict-aliasing)
+ target_link_libraries(main PRIVATE SDL2::SDL2 ${SNESRECOMP_RUNNER_LIBRARIES} log android m)
