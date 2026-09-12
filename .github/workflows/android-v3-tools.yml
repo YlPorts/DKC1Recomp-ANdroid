@@ -1,0 +1,67 @@
+name: Android v3 private build tools
+on:
+  push:
+    branches: ['android/initial-port']
+    paths: ['.github/workflows/android-v3-tools.yml']
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Archive source only (no ROM)
+        run: tar --exclude=.git -czf "$RUNNER_TEMP/source-v3.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-v3-source
+          path: ${{ runner.temp }}/source-v3.tar.gz
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare verified dependencies without game data
+        shell: bash
+        run: |
+          git show d78fe2c8e9672a75c49d01e3944691c92499d223:ci/prepare_offline.py > "$RUNNER_TEMP/prepare.py"
+          python3 "$RUNNER_TEMP/prepare.py"
+          split -b 400M -d "$RUNNER_TEMP/dkc1-offline/tools.p7m" "$RUNNER_TEMP/dkc1-offline/tools.part-"
+          cd "$RUNNER_TEMP/dkc1-offline"
+          sha256sum tools.part-* > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-v3-tools-00
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-00
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-v3-tools-01
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-01
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-v3-tools-02
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-02
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-v3-tools-03
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-03
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-v3-checksums
+          path: ${{ runner.temp }}/dkc1-offline/SHA256SUMS.txt
+          retention-days: 1
