@@ -58,7 +58,7 @@ target_include_directories(main PRIVATE "${DKC1_ROOT}/runner" "${DKC1_ROOT}/reco
 target_compile_definitions(main PRIVATE SNESRECOMP_SDL3=0 SNESRECOMP_TRACE=0
   SNESRECOMP_REVERSE_DEBUG=0 SNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1
   SYSTEM_VOLUME_MIXER_AVAILABLE=0 _POSIX_C_SOURCE=200809L
-  DKC1_BUILD_COMMIT="cb4dae77" DKC1_BUILD_CONFIG="android-0.1.0-dev")
+  DKC1_BUILD_COMMIT="cb4dae77" DKC1_BUILD_CONFIG="android-0.2.0-dev")
 # The upstream runtime performs typed accesses to byte-backed guest memory.
 target_compile_options(main PRIVATE -fno-strict-aliasing)
 target_link_libraries(main PRIVATE SDL2::SDL2 ${SNESRECOMP_RUNNER_LIBRARIES} log android m)
