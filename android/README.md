@@ -1,78 +1,94 @@
-# DKC1Recomp Android — development port
+# DKC1Recomp Mobile — Android 0.3.0-dev
 
-Spanish / Español
-
-Frontend Android ARM64 que utiliza el núcleo real de este fork. No ejecuta el EXE
-de Windows ni sustituye el juego por una demostración. La rama `main` conserva
-el proyecto de escritorio; la adaptación se desarrolla en `android/initial-port`.
-
-## Compilar
-
-Usa Python 3.10+, Git, JDK 17 o 21, SDK Android 35, Build Tools 35.0.0,
-CMake 3.22.1 y NDK 28.2.13676358. Gradle 8.11.1 y AGP 8.9.2 están fijados.
-Instala los componentes con Android Studio o sdkmanager y revisa sus licencias.
-
-```sh
-git clone --branch android/initial-port https://github.com/YlPorts/DKC1Recomp-ANdroid.git
-cd DKC1Recomp-ANdroid
-python android/tools/build_android.py --rom "/ruta/privada/dkc1.sfc" --sdk "/ruta/Android/Sdk"
-```
-
-La herramienta verifica la ROM, descarga las revisiones fijadas de snesrecomp y
-SDL2, genera código C fuera del control de versiones y ejecuta Gradle.
-Salida de depuración: `android/app/build/outputs/apk/debug/app-debug.apk`.
-No publica el APK ni la ROM. No acepta automáticamente licencias.
-
-Para regenerar fuentes tras cambios intencionados, `--regenerate` conserva antes
-un respaldo. `--prepare-only` prepara dependencias y fuentes sin invocar el NDK.
-`--verify-only` solo comprueba la ROM. No se acepta ningún hash alternativo.
-
-## ROM compatible
-
-Donkey Kong Country USA v1.0, exactamente 4.194.304 bytes sin cabecera:
-
-```
-fa8cacf5bbfc39ee6bbaa557adf89133d60d42f6cf9e1db30d5a36a469f74d15
-```
-
-Se admite la misma ROM con cabecera de copiador de 512 bytes. `.sfc` y `.smc`
-son válidos; ZIP, PAL y otras revisiones no. La ROM no está en el repositorio
-ni se empaqueta como archivo dentro del APK. El código nativo se genera a partir
-de la ROM, como en el proyecto original.
+Native ARM64 port of this repository's pinned game/runtime, with an Android
+SDL2 frontend. No Windows compatibility layer and no ROM bundled in the APK.
+This is a development build, not a claim of full desktop feature parity.
 
 ## Uso
 
-Objetivo: Android 6.0+ con sistema ARM64 y OpenGL ES 2.0. Instala el APK, abre
-la app y elige tu ROM compatible. Se importa al almacenamiento privado.
-Empieza por 4:3; 16:10 y 16:9 reutilizan las rutas experimentales upstream.
+Instala la aplicación **DKC1Recomp Mobile**. En `Juego`, selecciona tu ROM
+DKC1 USA v1.0 una sola vez. El importador comprueba el tamaño y SHA-256 y
+copia el contenido al almacenamiento privado. Después basta con `Jugar` o
+`Continuar partida`; no depende de que el archivo original conserve su nombre,
+ubicación o permiso SAF. Cambiar la ROM es una acción explícita en `Extras`.
+Desinstalar/borrar datos sí elimina la copia privada.
 
-Controles: cruceta, B para saltar, Y para correr/rodar/agarrar, X/A/L/R,
-SELECT y START. Se pueden mantener varios botones con varios dedos. `II` o
-Atrás abre pausa, estado rápido, audio y salida. Los mandos SDL usan posiciones
-físicas equivalentes a SNES. No hay pantalla de remapeo en esta primera versión.
+El panel oscuro toma como referencia la organización de PC y la adapta al
+control táctil. `II`, Atrás, Guide o Start + Select abre la pausa.
 
-Las partidas normales son SRAM privada. Los estados rápidos se separan por
-formato de pantalla. Un guardado inválido se conserva antes de reemplazarlo;
-un fallo al cargar un estado detiene la sesión sin persistir memoria alterada.
-La pantalla inicial permite exportar el diagnóstico nativo. Desinstalar borra
-los datos privados: no desinstales una versión con partidas sin respaldarlas.
+- **Juego:** continuar, guardar/cargar la ranura activa, volver al inicio.
+- **Gráficos:** 4:3, 16:10, 16:9 y 21:9 experimental; Nearest/Bilinear;
+  los mismos modelos de color Raw/CRT/Composite/Trinitron que PC;
+  scanlines ligeras y políticas de borde del nivel. El formato y los
+  arreglos acuáticos opcionales se aplican en la próxima sesión.
+- **Audio:** volumen y silencio persistentes.
+- **Controles:** ABXY de igual radio en un rombo simétrico; cruceta continua;
+  botones auxiliares del mismo tamaño. Escala 70–130 %, opacidad 20–90 %,
+  editor por arrastre con Guardar/Cancelar/Restablecer y posiciones relativas
+  al área segura. Dos mandos, zona muerta e intercambio de AB/XY.
+- **Partidas:** cinco ranuras por formato, SRAM independiente, estado automático
+  separado al pausar/salir y cada 1800 fotogramas, más exportación/restauración
+  acotada de partidas y ajustes desde el inicio. La copia no incluye ROMs.
+- **Extras:** cambio de ROM, diagnóstico y Baby Kong opcional del proyecto PC
+  (requiere ROM de DKC3 compatible; no se probó aquí por falta de esa ROM).
 
-## Validación y límites
+El CRT complejo de escritorio, Reconstruct, MSU-1 y rebobinado **no están
+integrados** en esta versión. No hay controles ficticios para esas funciones.
+El ultrawide hereda el código experimental de v0.2, sin ampliar de nuevo las
+colisiones ni activar el ensanchamiento experimental del cartucho.
+
+## Identidad y actualizaciones
+
+La clave privada de v0.2 no estaba disponible en esta sesión. Por eso v0.3
+usa un paquete separado y estable: `com.ylports.dkc1recomp.mobile`.
+Puede coexistir con las versiones anteriores; no requiere desinstalarlas.
+Sus archivos privados no se comparten, así que esta instalación requiere
+seleccionar la ROM una vez. No se afirma que pueda actualizar v0.2 en sitio.
+
+Para las futuras actualizaciones de Mobile se deben conservar ese identificador
+y **la misma clave de firma**, incrementando versionCode. La copia privada de la
+clave se entrega al propietario por separado. Nunca se debe subir al repositorio.
+
+## Build
+
+Requiere Python 3.10+, Git, JDK 17+, SDK platform 35, Build Tools 35.0.0,
+NDK 28.2.13676358, CMake 3.22.1 y Gradle 8.11.1 (bootstrap con hash verificado).
+El código Java usa nivel 17. Esta compilación se ejecutó con JDK 21.
 
 ```sh
-python android/tools/run_tests.py
+git clone --branch android/initial-port --recurse-submodules https://github.com/YlPorts/DKC1Recomp-ANdroid.git
+cd DKC1Recomp-ANdroid
+python android/tools/build_android.py --rom /ruta/privada/dkc1.sfc --sdk /ruta/android-sdk
 ```
 
-El workflow `Android source tests (no ROM)` valida utilidades C con sanitizadores,
-modelo de controles y verificador Java, y herramientas Python sin una ROM.
-Eso no equivale a probar el juego en Android. La compilación/enlace NDK, firma
-APK y las pruebas reales de arranque/audio/jugabilidad deben reportarse por
-separado. Consulta `VALIDACION_ACTUAL.md` cuando esté presente.
+El script valida primero la ROM y fija las revisiones de snesrecomp y SDL2.
+Genera las unidades C con el generador original y un manifiesto de integridad
+privado. La ROM y `generated/` deben quedar fuera de Git. El resultado por defecto
+es un APK **debug**; no está firmado con la clave de la entrega Mobile.
 
-El port no incluye los menús de escritorio, CRT avanzado, música MSU-1, Baby Kong
-ni editor de controles. Tampoco promete ultrawide arbitrario ni 60 FPS en todos
-los teléfonos. Los APK de desarrollo no tienen firma de publicación; conserva
-la clave de prueba para que futuras actualizaciones sean compatibles.
+Para release, tras la preparación:
 
-No subas ROMs, fuentes generadas, assets extraídos, saves o claves a GitHub.
-Conserva las licencias raíz, las del submódulo y `android/THIRD_PARTY_NOTICES.md`.
+```sh
+cd android
+./gradlew --no-daemon :app:assembleRelease :app:lintRelease
+# Firmar el APK release con la clave privada conservada y apksigner.
+python tools/verify_apk.py --apk /ruta/firmado.apk --sdk /ruta/android-sdk
+```
+
+No se deben autoaceptar licencias nuevas del SDK sin revisarlas.
+
+## Pruebas y límites
+
+```sh
+python android/tools/run_tests.py --report /ruta/pruebas.json
+```
+
+Las pruebas de fuente cubren utilidades C con ASan/UBSan, geometría uniforme,
+multitouch, rechazo de ROM inválida, exportación/restauración sin ROM, límites
+y rechazo de rutas peligrosas. No equivalen a ejecutar el APK en Android.
+`lint.xml` documenta excepciones acotadas al SDL2 fijado para APIs opcionales
+no usadas y subclases protegidas por nivel de API. La actividad corrige el
+registro privado del receptor USB para Android 13+ sin editar SDL2.
+
+El APK v0.3 se compiló y verificó, pero **todavía no se probó en un teléfono**.
+Consulta `VALIDACION_ACTUAL.md` para separar los resultados reales de lo pendiente.

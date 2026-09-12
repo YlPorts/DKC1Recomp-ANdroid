@@ -49,7 +49,7 @@ set(GAME
   dkc1_baby_kong_movement.c dkc1_margin_proxy.c dkc1_ws_trace.c
   input_playback.c wram_dump.c dkc1_script.c dkc1_debug_dump.c
   dkc1_flight_recorder.c dkc1_blank_scan.c dkc1_invariant_monitor.c
-  verified_rom.c headless_host.c desktop_audio_rate.c)
+  verified_rom.c headless_host.c desktop_audio_rate.c desktop_filter.c)
 list(TRANSFORM GAME PREPEND "${DKC1_ROOT}/runner/")
 add_library(main SHARED ${ENGINE} ${GEN_C} ${GAME}
   android_host.c android_platform.c)
@@ -58,7 +58,7 @@ target_include_directories(main PRIVATE "${DKC1_ROOT}/runner" "${DKC1_ROOT}/reco
 target_compile_definitions(main PRIVATE SNESRECOMP_SDL3=0 SNESRECOMP_TRACE=0
   SNESRECOMP_REVERSE_DEBUG=0 SNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1
   SYSTEM_VOLUME_MIXER_AVAILABLE=0 _POSIX_C_SOURCE=200809L
-  DKC1_BUILD_COMMIT="cb4dae77" DKC1_BUILD_CONFIG="android-0.2.0-dev")
+  DKC1_BUILD_COMMIT="cb4dae77" DKC1_BUILD_CONFIG="android-0.3.0-dev")
 # The upstream runtime performs typed accesses to byte-backed guest memory.
 target_compile_options(main PRIVATE -fno-strict-aliasing)
 target_link_libraries(main PRIVATE SDL2::SDL2 ${SNESRECOMP_RUNNER_LIBRARIES} log android m)

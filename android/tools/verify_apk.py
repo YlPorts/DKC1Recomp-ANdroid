@@ -37,7 +37,7 @@ def verify(apk: Path,sdk: Path) -> dict:
     signatures=run([str(sign),'verify','--verbose','--print-certs',str(apk)])
     alignment=run([str(tools/('zipalign'+executable)),'-c','-P','16','4',str(apk)])
     metadata=run([str(tools/('aapt'+executable)),'dump','badging',str(apk)])
-    if "name='com.ylports.dkc1recomp'" not in metadata:raise ValueError('Wrong package name')
+    if "name='com.ylports.dkc1recomp.mobile'" not in metadata:raise ValueError('Wrong package name')
     if "sdkVersion:'23'" not in metadata:raise ValueError('Unexpected minimum SDK')
     if "native-code: 'arm64-v8a'" not in metadata:raise ValueError('Unexpected ABI set')
     needed={'lib/arm64-v8a/libmain.so','lib/arm64-v8a/libSDL2.so'}
@@ -66,7 +66,7 @@ def verify(apk: Path,sdk: Path) -> dict:
                     symbols=run([str(nm),'-D','--defined-only',str(lib)])
                 exports={line.split()[-1] for line in symbols.splitlines() if line.split()}
                 required=['SDL_main']+['Java_com_ylports_dkc1recomp_GameActivity_'+n for n in
-                    ('nativeSetTouchMask','nativeSetMenuPaused','nativeSetLifecyclePaused','nativeRequest','nativeSetMuted')]
+                    ('nativeSetTouchMask','nativeSetMenuPaused','nativeSetLifecyclePaused','nativeRequest','nativeSetMuted','nativeConfigure')]
                 for symbol in required:
                     if symbol not in exports:raise ValueError('Missing native entry point: '+symbol)
     return dict(apk=apk.name,size_bytes=apk.stat().st_size,sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),

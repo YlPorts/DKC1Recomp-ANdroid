@@ -97,7 +97,7 @@ class ToolsTest(unittest.TestCase):
         java=(ANDROID/"app/src/main/java/com/ylports/dkc1recomp/GameActivity.java").read_text()
         c=(ANDROID/"native/android_host.c").read_text()
         names=re.findall(r"native void (native\w+)\(",java)
-        self.assertEqual(len(names),5)
+        self.assertEqual(len(names),6)
         for name in names:self.assertIn("Java_com_ylports_dkc1recomp_GameActivity_"+name,c)
     def test_no_desktop_frontend_linked(self):
         cmake=(ANDROID/"native/CMakeLists.txt").read_text()

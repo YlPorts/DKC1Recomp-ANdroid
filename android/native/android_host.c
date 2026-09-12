@@ -1,4 +1,4 @@
-/* DKC1Recomp Android frontend, v0.2.0-dev.
+/* DKC1Recomp Android frontend, v0.3.0-dev.
  * This host calls the real upstream game/runtime. It contains no replacement
  * emulator, game stubs, generated cartridge code, or bundled ROM data.
  * All game, audio producer, snapshot and SRAM operations run on SDL_main's
@@ -10,6 +10,8 @@
 #include "dkc1_video.h"
 #include "verified_rom.h"
 #include "desktop_audio_rate.h"
+#include "desktop_filter.h"
+#include "dkc1_baby_kong.h"
 #include "common_cpu_infra.h"
 #include "common_rtl.h"
 #include "audio_trace.h"
@@ -31,7 +33,27 @@
 #define TAG "DKC1Recomp"
 enum { CMD_SAVE=1, CMD_LOAD=2, CMD_QUIT=4, CMD_SRAM=8 };
 enum { AUDIO_RATE=32040, AUDIO_CHANNELS=2, AUDIO_CAPACITY=1024 };
-static atomic_uint s_touch, s_requests;
+static atomic_uint s_touch, s_requests, s_user_command;
+enum { OPT_VOLUME,OPT_SAMPLING,OPT_PALETTE,OPT_SCANLINES,OPT_SLOT,OPT_DEADZONE,
+       OPT_PAD_MAPPING,OPT_AUTOSAVE,OPT_EDGE,OPT_MUTED,OPT_BABY,OPT_COUNT };
+static atomic_int s_options[OPT_COUNT]={100,0,0,0,0,24,0,1,3,0,0};
+static atomic_int s_options_dirty;
+static uint8_t s_filtered[448*224*4];
+static Dkc1DesktopColorFilter s_color_filter;
+static int s_palette=-1, s_sampling=-1;
+static const char *s_aspect_key="4x3";
+static uint64_t s_last_auto_frame=UINT64_MAX;
+static int ClampOption(int v,int lo,int hi){return v<lo?lo:v>hi?hi:v;}
+JNIEXPORT void JNICALL Java_com_ylports_dkc1recomp_GameActivity_nativeConfigure
+(JNIEnv *env,jclass cls,jintArray options) {
+  (void)cls;if(!options||(*env)->GetArrayLength(env,options)!=OPT_COUNT)return;
+  jint values[OPT_COUNT];(*env)->GetIntArrayRegion(env,options,0,OPT_COUNT,values);
+  if((*env)->ExceptionCheck(env))return;
+  const int lo[OPT_COUNT]={0,0,0,0,0,5,0,0,0,0,0};
+  const int hi[OPT_COUNT]={100,1,3,60,4,50,1,1,3,1,1};
+  for(int i=0;i<OPT_COUNT;i++)atomic_store(&s_options[i],ClampOption(values[i],lo[i],hi[i]));
+  atomic_store(&s_options_dirty,1);
+}
 static atomic_int s_menu_paused, s_lifecycle_paused, s_os_background, s_muted;
 static SDL_Window *s_window;
 static SDL_Renderer *s_renderer;
@@ -46,7 +68,7 @@ static uint8_t s_pixels[ANDROID_MAX_WIDTH*kDkc1VideoHeight*4];
 static uint8_t *s_last_sram;
 static size_t s_last_sram_size;
 static int s_sram_persisted, s_sram_writable=1, s_failed;
-static const char *s_snapshot="quicksave-4x3.state";
+
 static uint64_t s_frame;
 static int s_audio_started, s_audio_waiting=1;
 static unsigned s_audio_threshold=2136;
@@ -70,7 +92,12 @@ JNIEXPORT void JNICALL Java_com_ylports_dkc1recomp_GameActivity_nativeSetLifecyc
 }
 JNIEXPORT void JNICALL Java_com_ylports_dkc1recomp_GameActivity_nativeRequest
 (JNIEnv *env,jclass cls,jint command) {
-  (void)env;(void)cls;atomic_fetch_or(&s_requests,(unsigned)command&7u);
+  (void)env;(void)cls;
+  if(command&CMD_QUIT)atomic_fetch_or(&s_requests,CMD_QUIT);
+  unsigned expected=0,request=(unsigned)command&3u;
+  if(request){request|=(unsigned)atomic_load(&s_options[OPT_SLOT])<<8;
+    (void)atomic_compare_exchange_strong(&s_user_command,&expected,request);}
+
 }
 JNIEXPORT void JNICALL Java_com_ylports_dkc1recomp_GameActivity_nativeSetMuted
 (JNIEnv *env,jclass cls,jboolean muted) {
@@ -159,17 +186,27 @@ static void LoadSram(void) {
     }
   }
 }
-static int SaveSnapshot(void) {
+static int SaveSnapshotTo(const char *path) {
   /* Upstream writes its actual v8-compatible native snapshot. Rename only
    * after a complete successful write, preserving the previous quicksave. */
   char temporary[PATH_MAX];
-  int length=snprintf(temporary,sizeof temporary,"%s.tmp.XXXXXX",s_snapshot);
+  int length=snprintf(temporary,sizeof temporary,"%s.tmp.XXXXXX",path);
   if(length<0||(size_t)length>=sizeof temporary)return 0;
   int fd=mkstemp(temporary);if(fd<0)return 0;
   if(close(fd)!=0){unlink(temporary);return 0;}
-  int ok=RtlSaveSnapshot(temporary)&&Dkc1AndroidCommitFile(temporary,s_snapshot);
+  int ok=RtlSaveSnapshot(temporary)&&Dkc1AndroidCommitFile(temporary,path);
   if(!ok)unlink(temporary);
   return ok;
+}
+static void SnapshotPath(char path[96],int slot) {
+  if(slot==0)snprintf(path,96,"quicksave-%s.state",s_aspect_key);
+  else snprintf(path,96,"quicksave-%s-slot%d.state",s_aspect_key,slot+1);
+}
+static void AutoSnapshot(void) {
+  if(!atomic_load(&s_options[OPT_AUTOSAVE])||s_failed||!s_core_ready||!s_frame||s_last_auto_frame==s_frame)return;
+  char path[96];snprintf(path,sizeof path,"autosave-%s.state",s_aspect_key);
+  if(SaveSnapshotTo(path))s_last_auto_frame=s_frame;
+  else Notice("No se pudo guardar el estado automatico; las ranuras manuales se conservan.");
 }
 static void ResetAudio(void) {
   Dkc1AudioStretchReset(&s_stretch);s_audio_average=-1;
@@ -211,7 +248,8 @@ static void PumpAudio(void) {
   s_audio_average=Dkc1AudioFillAverage(s_audio_average,queued,0.02);
   double ratio=s_audio_started?Dkc1AudioRateRatio(s_audio_average,s_audio_target,0.005,4.0):1.0;
   frames=Dkc1AudioStretchProcess(&s_stretch,ratio,s_audio_in,frames,s_audio_out,AUDIO_CAPACITY+16);
-  if(atomic_load(&s_muted))memset(s_audio_out,0,(size_t)frames*2*sizeof(int16_t));
+  int volume=(atomic_load(&s_muted)||atomic_load(&s_options[OPT_MUTED]))?0:atomic_load(&s_options[OPT_VOLUME]);
+  if(volume!=100)for(int i=0;i<frames*2;i++)s_audio_out[i]=(int16_t)((int)s_audio_out[i]*volume/100);
   if(SDL_QueueAudio(s_audio,s_audio_out,(Uint32)frames*2u*sizeof(int16_t))!=0){
     fprintf(stderr,"[audio] queue failed: %s\n",SDL_GetError());ResetAudio();return;
   }
@@ -222,6 +260,8 @@ static int CreateTexture(void) {
   if(Background())return 1; /* deferred until the surface can be used */
   if(s_texture){SDL_DestroyTexture(s_texture);s_texture=NULL;}
   s_width=Dkc1VideoWidth();
+  if(s_width<256||s_width>ANDROID_MAX_WIDTH)return 0;
+  s_sampling=-1;
   s_texture=SDL_CreateTexture(s_renderer,SDL_PIXELFORMAT_ARGB8888,
     SDL_TEXTUREACCESS_STREAMING,s_width,kDkc1VideoHeight);
   if(!s_texture)return 0;
@@ -252,9 +292,30 @@ static int Present(void) {
   if(SDL_GetRendererOutputSize(s_renderer,&width,&height)!=0||width<=0||height<=0)return 1;
   Dkc1AndroidRect fit=Dkc1AndroidFit(width,height,s_width,kDkc1VideoHeight);
   SDL_Rect destination={fit.x,fit.y,fit.w,fit.h};
-  if(SDL_UpdateTexture(s_texture,NULL,s_pixels,s_width*4)!=0)return 0;
+  const int palette=atomic_load(&s_options[OPT_PALETTE]),sampling=atomic_load(&s_options[OPT_SAMPLING]);
+  if(s_palette!=palette){
+    if(!Dkc1DesktopColorFilterInit(&s_color_filter,palette)){
+      Dkc1DesktopColorFilterInit(&s_color_filter,0);Notice("Modelo de color no disponible; se usa el original.");
+    }
+    s_palette=palette;
+  }
+  if(s_sampling!=sampling){SDL_SetTextureScaleMode(s_texture,sampling?SDL_ScaleModeLinear:SDL_ScaleModeNearest);s_sampling=sampling;}
+  const uint8_t *display=Dkc1DesktopColorFilterApply(&s_color_filter,s_pixels,s_filtered,(size_t)s_width*kDkc1VideoHeight);
+  if(!display)display=s_pixels;
+  if(SDL_UpdateTexture(s_texture,NULL,display,s_width*4)!=0)return 0;
+  SDL_SetRenderDrawColor(s_renderer,0,0,0,255);
   if(SDL_RenderClear(s_renderer)!=0)return 0;
   if(SDL_RenderCopy(s_renderer,s_texture,NULL,&destination)!=0)return 0;
+  int lines=atomic_load(&s_options[OPT_SCANLINES]);
+  if(lines>0&&fit.h>=kDkc1VideoHeight*2){
+    SDL_SetRenderDrawBlendMode(s_renderer,SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(s_renderer,0,0,0,(Uint8)(lines*255/100));
+    for(int row=0;row<kDkc1VideoHeight;row++){
+      int y=fit.y+(row*fit.h+fit.h*3/4)/kDkc1VideoHeight;
+      SDL_RenderDrawLine(s_renderer,fit.x,y,fit.x+fit.w-1,y);
+    }
+    SDL_SetRenderDrawBlendMode(s_renderer,SDL_BLENDMODE_NONE);
+  }
   SDL_RenderPresent(s_renderer);return 1;
 }
 static void OpenControllers(void) {
@@ -275,9 +336,14 @@ static uint32_t ControllerInput(SDL_GameController *pad) {
     SDL_CONTROLLER_BUTTON_DPAD_DOWN,SDL_CONTROLLER_BUTTON_DPAD_LEFT,SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
     SDL_CONTROLLER_BUTTON_B,SDL_CONTROLLER_BUTTON_Y,SDL_CONTROLLER_BUTTON_LEFTSHOULDER,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER};
   for(int i=0;i<12;i++)if(SDL_GameControllerGetButton(pad,buttons[i]))mask|=1u<<i;
+  if(atomic_load(&s_options[OPT_PAD_MAPPING])){
+    unsigned face=mask&(1u|2u|256u|512u);mask&=~(1u|2u|256u|512u);
+    mask|=((face&3u)<<8)|((face>>8)&3u);
+  }
   int x=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_LEFTX);
   int y=SDL_GameControllerGetAxis(pad,SDL_CONTROLLER_AXIS_LEFTY);
-  if(x<-8000)mask|=64;if(x>8000)mask|=128;if(y<-8000)mask|=16;if(y>8000)mask|=32;
+  int dead=atomic_load(&s_options[OPT_DEADZONE])*32767/100;
+  if(x< -dead)mask|=64;if(x>dead)mask|=128;if(y< -dead)mask|=16;if(y>dead)mask|=32;
   return mask;
 }
 static uint32_t PollInput(void) {
@@ -331,21 +397,28 @@ static void PollEvents(void) {
   }
 }
 static void HandleRequests(void) {
-  unsigned requests=atomic_exchange(&s_requests,0);
+  if(atomic_exchange(&s_options_dirty,0)){
+    s_ready_for_present=1;
+    Dkc1VideoSetEdgePolicy((Dkc1EdgePolicy)atomic_load(&s_options[OPT_EDGE]));
+    if(Dkc1BabyKongReady())Dkc1BabyKongSetEnabled(atomic_load(&s_options[OPT_BABY])!=0);
+  }
+  unsigned user=atomic_exchange(&s_user_command,0);
+  char slot_path[96];SnapshotPath(slot_path,ClampOption((int)((user>>8)&7),0,4));
+  unsigned requests=atomic_exchange(&s_requests,0)|(user&3u);
   if(requests&CMD_QUIT){s_running=0;return;}
-  if((requests&CMD_SRAM)&&!SaveSram())Notice("No se pudo guardar la SRAM.");
+  if(requests&CMD_SRAM){if(!SaveSram())Notice("No se pudo guardar la SRAM.");AutoSnapshot();}
   if(requests&CMD_SAVE){
-    int state_ok=SaveSnapshot(),sram_ok=SaveSram();
+    int state_ok=SaveSnapshotTo(slot_path),sram_ok=SaveSram();
     Notice(state_ok&&sram_ok?"Estado rapido guardado.":"Error al guardar. El guardado anterior se conserva si fallo su escritura.");
   }
   if(requests&CMD_LOAD){
-    if(access(s_snapshot,F_OK)!=0){Notice("No hay un estado rapido para este formato de pantalla.");return;}
-    if(!RtlLoadSnapshot(s_snapshot)){
+    if(access(slot_path,F_OK)!=0){Notice("No hay un estado rapido para este formato de pantalla.");return;}
+    if(!RtlLoadSnapshot(slot_path)){
       /* A failed loader may have partially changed runtime state. Never run
        * or persist that state; restart the isolated game process instead. */
       Failure("No se pudo cargar el estado. Se ha detenido el juego sin guardar cambios.");return;
     }
-    ResetAudio();atomic_store(&s_touch,0);
+    ResetAudio();s_last_auto_frame=UINT64_MAX;atomic_store(&s_touch,0);
     if(Dkc1VideoWidth()!=s_width)s_need_texture=1;
     Dkc1BeginDrawing(s_pixels,(size_t)Dkc1VideoWidth()*4);Dkc1DrawPpuFrame();
     s_ready_for_present=1;Notice("Estado rapido cargado.");
@@ -370,10 +443,14 @@ __attribute__((visibility("default"))) int SDL_main(int argc,char **argv) {
     (void)rename("android.log","android.log.1");
   (void)freopen("android.log","a",stderr);setvbuf(stderr,NULL,_IONBF,0);
   (void)unlink("last-error.txt");
-  fprintf(stderr,"\n[start] android-0.2.0-dev base=cb4dae77 arm64 aspect=%s\n",aspect?aspect:"4:3");
+  fprintf(stderr,"\n[start] android-0.3.0-dev base=cb4dae77 arm64 aspect=%s\n",aspect?aspect:"4:3");
   /* Keep speculative upstream widescreen switches off. Never weaken ROM verification. */
   (void)unsetenv("DKC1_ALLOW_ROM_SHA256");
   (void)setenv("DKC1_ENABLE_EXPERIMENTAL_CARTRIDGE_WIDENING","0",1);
+  const char *aquatic=Argument(argc,argv,"--aquatic");
+  const char *water=(aquatic&&strcmp(aquatic,"1")==0)?"1":"0";
+  const char *flags[]={"DKC1_WS_PIXEL_BOUNDARIES","DKC1_WS_LIVE_SCROLL","DKC1_WS_SCROLL_REBASE","DKC1_WS_WALL_ADJACENCY","DKC1_WS_WALL_SEAMS"};
+  for(int i=0;i<5;i++)(void)setenv(flags[i],water,1);
   (void)mkdir("tier2",0700);(void)setenv("SNESRECOMP_TIER2_DIR","tier2",1);
   SDL_SetHint(SDL_HINT_ORIENTATIONS,"LandscapeLeft LandscapeRight");
   SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE,"0");
@@ -397,9 +474,20 @@ __attribute__((visibility("default"))) int SDL_main(int argc,char **argv) {
   if(!SnesInit(rom,(int)rom_size)){Failure("El nucleo rechazo la ROM verificada.");result=4;goto cleanup;}
   s_core_ready=1;LoadSram();
   if(s_failed){result=6;goto cleanup;}
-  s_snapshot=ultrawide?"quicksave-21x9.state":
-    Dkc1VideoGetAspect()==kDkc1VideoAspect16x9?"quicksave-16x9.state":
-    Dkc1VideoGetAspect()==kDkc1VideoAspect16x10?"quicksave-16x10.state":"quicksave-4x3.state";
+  s_aspect_key=ultrawide?"21x9":Dkc1VideoGetAspect()==kDkc1VideoAspect16x9?"16x9":Dkc1VideoGetAspect()==kDkc1VideoAspect16x10?"16x10":"4x3";
+  const char *baby=Argument(argc,argv,"--baby-rom");
+  if(baby&&*baby){
+    if(Dkc1BabyKongLoadRom(baby,error,sizeof error))Dkc1BabyKongSetEnabled(atomic_load(&s_options[OPT_BABY])!=0);
+    else Notice("Baby Kong desactivado: no se pudo verificar la ROM de DKC3.");
+  }
+  const char *resume=Argument(argc,argv,"--resume");
+  if(resume&&!strcmp(resume,"1")){
+    char path[96];snprintf(path,sizeof path,"autosave-%s.state",s_aspect_key);
+    if(access(path,F_OK)==0){
+      if(!RtlLoadSnapshot(path)){Failure("El estado automatico no se pudo cargar. Vuelve al inicio y elige Iniciar desde el titulo.");result=6;goto cleanup;}
+      s_ready_for_present=1;
+    }
+  }
   s_width=Dkc1VideoWidth();Dkc1BeginDrawing(s_pixels,(size_t)s_width*4);
   if(!InitVideo()){Failure(SDL_GetError());result=3;goto cleanup;}
   InitAudio();OpenControllers();
@@ -410,7 +498,7 @@ __attribute__((visibility("default"))) int SDL_main(int argc,char **argv) {
   while(s_running){
     PollEvents();HandleRequests();if(!s_running)break;
     if(Paused()){
-      if(!was_paused){ResetAudio();if(!SaveSram())Notice("No se pudo guardar la SRAM al pausar.");}
+      if(!was_paused){ResetAudio();if(!SaveSram())Notice("No se pudo guardar la SRAM al pausar.");AutoSnapshot();}
       was_paused=1;
       if(!Background()&&s_ready_for_present){
         if(!Present()){Failure(SDL_GetError());result=3;break;}
@@ -437,6 +525,7 @@ __attribute__((visibility("default"))) int SDL_main(int argc,char **argv) {
     PumpAudio();
     if(!Background()&&!Present()){Failure(SDL_GetError());result=3;break;}
     if(s_frame%300==0&&!SaveSram())Notice("No se pudo guardar la SRAM periodica.");
+    if(s_frame%1800==0)AutoSnapshot();
     now=(double)SDL_GetPerformanceCounter();
     if(Dkc1AndroidClockAdvance(&clock,now))ResetAudio();
     if(s_frame%600==0){
@@ -449,7 +538,7 @@ __attribute__((visibility("default"))) int SDL_main(int argc,char **argv) {
 cleanup:
   /* Never overwrite the user's SRAM with a core state that went off-rails. */
   if(s_failed&&result==0)result=6;
-  if(result==0&&!SaveSram())Notice("No se pudo guardar la SRAM al salir.");
+  if(result==0){if(!SaveSram())Notice("No se pudo guardar la SRAM al salir.");AutoSnapshot();}
   if(s_audio){SDL_PauseAudioDevice(s_audio,1);SDL_CloseAudioDevice(s_audio);s_audio=0;}
   SDL_DelEventWatch(EventWatch,NULL);
   for(int p=0;p<2;p++)if(s_pads[p])SDL_GameControllerClose(s_pads[p]);

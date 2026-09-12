@@ -34,8 +34,9 @@ def main() -> int:
             run("C utilities with ASan/UBSan",[binary])
         sources=ANDROID/"app/src/main/java/com/ylports/dkc1recomp"
         if run("Pure-Java unit test compilation",["javac","--release","17","-d",java,
-                sources/"PadModel.java",sources/"RomVerifier.java",ANDROID/"tests/PortTests.java"]):
+                sources/"PadModel.java",sources/"RomVerifier.java",sources/"SaveBackup.java",ANDROID/"tests/PortTests.java",ANDROID/"tests/BackupTests.java"]):
             run("Java controls and ROM rejection",["java","-ea","-cp",java,"com.ylports.dkc1recomp.PortTests"])
+            run("Java backup security and uniform layout",["java","-ea","-cp",java,"com.ylports.dkc1recomp.BackupTests"])
         run("Python build-tool and static contract tests",[sys.executable,ANDROID/"tests/test_tools.py"])
     report={"scope":"Host-side unit tests only","all_executed_tests_passed":ok,
         "android_apk_built":False,"android_ndk_compile_tested":False,

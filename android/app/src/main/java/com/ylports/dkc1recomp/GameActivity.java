@@ -1,144 +1,106 @@
 package com.ylports.dkc1recomp;
 
-import android.app.AlertDialog;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.Process;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.WindowInsets;
-import android.view.WindowManager;
+import android.app.*;
+import android.os.*;
+import android.view.*;
 import android.widget.Toast;
 import java.io.File;
 import org.libsdl.app.SDLActivity;
 
-/** SDL owns the game thread. UI/JNI methods only publish atomic requests. */
-public final class GameActivity extends SDLActivity {
-    public static final int SAVE=1, LOAD=2, QUIT=4;
+/** UI publishes requests; the SDL thread remains the sole owner of game/audio/saves. */
+public final class GameActivity extends SDLActivity implements OptionsPanel.Host {
+    public static final int SAVE=1,LOAD=2,QUIT=4;
     public static native void nativeSetTouchMask(int mask);
     public static native void nativeSetMenuPaused(boolean paused);
     public static native void nativeSetLifecyclePaused(boolean paused);
     public static native void nativeRequest(int command);
     public static native void nativeSetMuted(boolean muted);
-    private TouchControls controls;
-    private AlertDialog menu;
-    private boolean exiting,buttons=true,muted,controlsEditing,settingsOpen;
+    public static native void nativeConfigure(int[] options);
+    private AppSettings settings;private TouchControls controls;private Dialog dialog;private OptionsPanel panel;
+    private boolean exiting;private String currentAspect="4:3",notice="Partida en curso";
     @Override protected String[] getLibraries(){return new String[]{"SDL2","main"};}
     @Override protected String[] getArguments(){
-        File dir=LauncherActivity.gameDirectory(this);
-        String aspect=getIntent().getStringExtra("aspect");
-        if(!"16:10".equals(aspect)&&!"16:9".equals(aspect)&&!"21:9".equals(aspect))aspect="4:3";
-        return new String[]{"--rom",new File(dir,"dkc1.sfc").getAbsolutePath(),
-            "--state-dir",dir.getAbsolutePath(),"--aspect",aspect};
+        File dir=AppSettings.gameDirectory(this);
+        return new String[]{"--rom",new File(dir,"dkc1.sfc").getAbsolutePath(),"--state-dir",dir.getAbsolutePath(),
+            "--aspect",currentAspect,"--resume",getIntent().getBooleanExtra("resume",false)?"1":"0",
+            "--baby-rom",settings.flag("baby",false)?new File(dir,"dkc3.sfc").getAbsolutePath():"",
+            "--aquatic",settings.flag("aquatic",false)?"1":"0"};
     }
-    @Override protected void onCreate(Bundle saved){
-        // The SDL surface must occupy the complete physical display. Insets are
-        // applied only to touch controls, never as padding around the game.
+    /** The pinned SDL HID manager uses this Activity as its Context. Keep its
+     * app-private USB permission receiver non-exported on modern Android. */
+    @Override public android.content.Intent registerReceiver(android.content.BroadcastReceiver receiver,android.content.IntentFilter filter){
+        if(Build.VERSION.SDK_INT>=33&&filter!=null&&filter.hasAction("org.libsdl.app.USB_PERMISSION"))
+            return super.registerReceiver(receiver,filter,android.content.Context.RECEIVER_NOT_EXPORTED);
+        return super.registerReceiver(receiver,filter);
+    }
+    @Override protected void onCreate(Bundle state){
+        settings=new AppSettings(this);String aspect=getIntent().getStringExtra("aspect");
+        for(String candidate:AppSettings.ASPECTS)if(candidate.equals(aspect))currentAspect=candidate;
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
-        else getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|
-            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_FULLSCREEN|
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        if(Build.VERSION.SDK_INT>=28){
-            WindowManager.LayoutParams lp=getWindow().getAttributes();
-            lp.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            getWindow().setAttributes(lp);
+        if(Build.VERSION.SDK_INT>=28){WindowManager.LayoutParams p=getWindow().getAttributes();p.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;getWindow().setAttributes(p);}
+        super.onCreate(state);if(mBrokenLibraries||mLayout==null)return;
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);Ui.immersive(this);mLayout.setPadding(0,0,0,0);
+        controls=new TouchControls(this,settings,()->showMenu(0),()->showMenu(3));
+        mLayout.addView(controls,new ViewGroup.LayoutParams(-1,-1));controls.applySettings();changed();
+        mLayout.setOnApplyWindowInsetsListener((v,i)->{
+            int l=0,t=0,r=0,b=0;
+            if(Build.VERSION.SDK_INT>=30){android.graphics.Insets safe=i.getInsets(WindowInsets.Type.displayCutout()|WindowInsets.Type.systemGestures());l=safe.left;t=safe.top;r=safe.right;b=safe.bottom;}
+            else if(Build.VERSION.SDK_INT>=28&&i.getDisplayCutout()!=null){l=i.getDisplayCutout().getSafeInsetLeft();r=i.getDisplayCutout().getSafeInsetRight();t=i.getDisplayCutout().getSafeInsetTop();b=i.getDisplayCutout().getSafeInsetBottom();}
+            controls.setSafeInsets(l,t,r,b);return i;
+        });mLayout.requestApplyInsets();
+        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
+    }
+    @Override protected void onPause(){if(!mBrokenLibraries){if(controls!=null)controls.releaseAll();nativeSetLifecyclePaused(true);}if(settings!=null)settings.save();super.onPause();}
+    @Override protected void onResume(){super.onResume();Ui.immersive(this);if(!mBrokenLibraries)nativeSetLifecyclePaused(false);}
+    @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);if(focus&&dialog==null)Ui.immersive(this);}
+    @Override public void onBackPressed(){if(mBrokenLibraries)super.onBackPressed();else back();}
+    private void back(){if(controls!=null&&controls.isEditing())controls.finishEdit(false);else if(dialog!=null)dialog.dismiss();else showMenu(0);}
+    public void openPauseFromNative(){runOnUiThread(()->showMenu(0));}
+    public void onNativeStatus(String value){runOnUiThread(()->{
+        if(isFinishing()||isDestroyed())return;notice=value;Toast.makeText(this,value,Toast.LENGTH_SHORT).show();if(panel!=null&&dialog!=null)panel.refresh();
+    });}
+    private void showMenu(int page){
+        if(mBrokenLibraries||exiting||isFinishing()||dialog!=null||controls==null||controls.isEditing())return;
+        nativeSetMenuPaused(true);controls.releaseAll();
+        dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        panel=new OptionsPanel(this,settings,this,page);dialog.setContentView(panel);
+        dialog.setOnDismissListener(d->{dialog=null;panel=null;settings.save();controls.applySettings();Ui.immersive(this);if(!exiting&&!controls.isEditing())nativeSetMenuPaused(false);});
+        dialog.show();Window w=dialog.getWindow();if(w!=null){
+            w.setBackgroundDrawable(Ui.bg(Ui.BG,Ui.dp(this,12)));w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);w.setDimAmount(.65f);
+            int width=getResources().getDisplayMetrics().widthPixels,height=getResources().getDisplayMetrics().heightPixels;
+            w.setLayout(Math.min(width-Ui.dp(this,16),Ui.dp(this,1000)),height-Ui.dp(this,16));
         }
-        super.onCreate(saved);
-        if(mBrokenLibraries||mLayout==null)return;
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        enterImmersive();
-        controls=new TouchControls(this,this::showPauseMenu,this::finishControlEdit);
-        mLayout.addView(controls,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT));
-        mLayout.setPadding(0,0,0,0);
-        mLayout.setOnApplyWindowInsetsListener((v,insets)->{
-            int left,right,top,bottom;
-            if(Build.VERSION.SDK_INT>=30){
-                android.graphics.Insets safe=insets.getInsetsIgnoringVisibility(
-                    WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
-                left=safe.left;right=safe.right;top=safe.top;bottom=safe.bottom;
-            }else{
-                left=insets.getSystemWindowInsetLeft();right=insets.getSystemWindowInsetRight();
-                top=insets.getSystemWindowInsetTop();bottom=insets.getSystemWindowInsetBottom();
-                if(Build.VERSION.SDK_INT>=28&&insets.getDisplayCutout()!=null){
-                    left=Math.max(left,insets.getDisplayCutout().getSafeInsetLeft());
-                    right=Math.max(right,insets.getDisplayCutout().getSafeInsetRight());
-                    top=Math.max(top,insets.getDisplayCutout().getSafeInsetTop());
-                    bottom=Math.max(bottom,insets.getDisplayCutout().getSafeInsetBottom());
-                }
-            }
-            if(controls!=null)controls.setSafeInsets(left,top,right,bottom);
-            return insets;
-        });
-        mLayout.requestApplyInsets();
-        if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-            android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
     }
-    @Override protected void onPause(){
-        if(!mBrokenLibraries){if(controls!=null)controls.releaseAll();nativeSetLifecyclePaused(true);}
-        super.onPause();
+    @Override public boolean inGame(){return true;}
+    @Override public boolean romReady(){return true;}
+    @Override public boolean busy(){return false;}
+    @Override public String activeAspect(){return currentAspect;}
+    @Override public String status(){return "Formato actual: "+currentAspect+" · "+notice;}
+    @Override public void changed(){
+        if(mBrokenLibraries)return;
+        nativeConfigure(new int[]{settings.get("volume",100,0,100),settings.get("sampling",0,0,1),settings.get("palette",0,0,3),settings.get("scanlines",0,0,60),settings.slot(),settings.get("deadzone",24,5,50),settings.get("pad_mapping",0,0,1),settings.flag("autosave",true)?1:0,settings.get("edge",3,0,3),settings.flag("muted",false)?1:0,settings.flag("baby",false)?1:0});
+        if(controls!=null&&!controls.isEditing())controls.applySettings();
     }
-    @Override protected void onResume(){
-        super.onResume();enterImmersive();if(!mBrokenLibraries)nativeSetLifecyclePaused(false);
-    }
-    private void enterImmersive(){
-        if(Build.VERSION.SDK_INT>=30){
-            android.view.WindowInsetsController c=getWindow().getInsetsController();
-            if(c!=null){c.hide(WindowInsets.Type.systemBars());c.setSystemBarsBehavior(
-                android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);}
-        }else getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|
-            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_FULLSCREEN|
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-    }
-    @Override public void onBackPressed(){if(mBrokenLibraries)super.onBackPressed();else handleBack();}
-    private void handleBack(){if(controlsEditing)finishControlEdit();else showPauseMenu();}
-    public void openPauseFromNative(){runOnUiThread(this::showPauseMenu);}
-    public void onNativeStatus(String message){
-        runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())Toast.makeText(this,message,Toast.LENGTH_LONG).show();});
-    }
-    private void showPauseMenu(){
-        if(mBrokenLibraries||exiting||controlsEditing||settingsOpen||isFinishing()||(menu!=null&&menu.isShowing()))return;
-        nativeSetMenuPaused(true);if(controls!=null)controls.releaseAll();
-        String[] items={"Continuar", "Guardar estado rápido", "Cargar estado rápido",
-            muted?"Activar sonido":"Silenciar",buttons?"Ocultar controles":"Mostrar controles",
-            "Ajustes de controles…", "Salir al inicio"};
-        menu=new AlertDialog.Builder(this).setTitle("DKC1Recomp · pausa")
-            .setItems(items,(dialog,which)->{
-                switch(which){
-                    case 1:nativeRequest(SAVE);break;
-                    case 2:nativeRequest(LOAD);break;
-                    case 3:muted=!muted;nativeSetMuted(muted);break;
-                    case 4:buttons=!buttons;if(controls!=null)controls.setButtonsVisible(buttons);break;
-                    case 5:settingsOpen=true;mLayout.post(this::showControlSettings);break;
-                    case 6:exiting=true;nativeRequest(QUIT);break;
-                    default:break;
-                }
-            }).create();
-        menu.setOnDismissListener(dialog->{menu=null;enterImmersive();if(!exiting&&!controlsEditing&&!settingsOpen)nativeSetMenuPaused(false);});
-        menu.show();
-    }
-    private void showControlSettings(){
-        if(exiting||isFinishing()){settingsOpen=false;return;}
-        AlertDialog settings=new AlertDialog.Builder(this).setTitle("Ajustes de controles")
-            .setItems(new String[]{"Mover botones", "Restablecer posiciones", "Cancelar"},(d,which)->{
-                if(which==0){controlsEditing=true;if(controls!=null)controls.beginEdit();}
-                else if(which==1&&controls!=null){controls.resetLayout();Toast.makeText(this,"Posiciones restablecidas.",Toast.LENGTH_SHORT).show();}
-            }).create();
-        settings.setOnDismissListener(d->{settingsOpen=false;enterImmersive();if(!controlsEditing&&!exiting)nativeSetMenuPaused(false);});
-        settings.show();
-    }
-    private void finishControlEdit(){
-        controlsEditing=false;enterImmersive();showPauseMenu();
+    @Override public void action(String name){
+        switch(name){
+            case "resume":if(dialog!=null)dialog.dismiss();break;
+            case "save":
+                File slot=new File(AppSettings.gameDirectory(this),"quicksave-"+currentAspect.replace(':','x')+(settings.slot()==0?"":"-slot"+(settings.slot()+1))+".state");
+                if(slot.isFile())new AlertDialog.Builder(this).setTitle("Reemplazar ranura "+(settings.slot()+1)+"?").setMessage("Se guardará la partida actual en esta ranura.")
+                    .setPositiveButton("Guardar",(d,w)->nativeRequest(SAVE)).setNegativeButton("Cancelar",null).show();else nativeRequest(SAVE);break;
+            case "load":new AlertDialog.Builder(this).setTitle("Cargar ranura "+(settings.slot()+1)+"?").setMessage("Se reemplazará el estado de la sesión actual.")
+                .setPositiveButton("Cargar",(d,w)->nativeRequest(LOAD)).setNegativeButton("Cancelar",null).show();break;
+            case "quit":exiting=true;settings.save();nativeRequest(QUIT);if(dialog!=null)dialog.dismiss();break;
+            case "edit_controls":controls.beginEdit();if(dialog!=null)dialog.dismiss();break;
+            case "reset_controls":new AlertDialog.Builder(this).setTitle("Restablecer controles")
+                .setMessage("Volver al tamaño y la distribución estándar?").setPositiveButton("Restablecer",(d,w)->{settings.set("touch_size",100);controls.resetLayout();changed();if(panel!=null)panel.refresh();}).setNegativeButton("Cancelar",null).show();break;
+            default:break;
+        }
     }
     @Override protected void onDestroy(){
-        // Request a normal native exit first. SDL's onDestroy joins its thread.
-        exiting=true;
-        if(!mBrokenLibraries){nativeSetTouchMask(0);nativeRequest(QUIT);}
-        super.onDestroy();
-        // Only this private :game process is terminated, never the launcher.
-        // A fresh process is essential until upstream session-reset is validated.
-        if(isFinishing())Process.killProcess(Process.myPid());
+        exiting=true;if(!mBrokenLibraries){nativeSetTouchMask(0);nativeRequest(QUIT);}if(settings!=null)settings.save();
+        if(dialog!=null)dialog.dismiss();super.onDestroy();
+        // Only the isolated game process exits; next launch has clean core globals.
+        if(isFinishing())android.os.Process.killProcess(android.os.Process.myPid());
     }
 }
