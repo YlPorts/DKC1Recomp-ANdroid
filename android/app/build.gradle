@@ -28,3 +28,26 @@ android {
     packaging { jniLibs { useLegacyPackaging false } }
     lint { abortOnError true }
 }
+
+// Include all relevant source notices with both APK variants, never ROM data.
+def noticeDir = layout.buildDirectory.dir('generated/licenseAssets')
+def prepareNotices = tasks.register('prepareLicenseAssets', Sync) {
+    into noticeDir.map { it.dir('licenses') }
+    from('../../LICENSE') { rename { 'DKC1Recomp-LICENSE.txt' } }
+    from('../../THIRD_PARTY_NOTICES.md') { rename { 'DKC1Recomp-THIRD-PARTY.md' } }
+    from('../LICENSE') { rename { 'Android-port-LICENSE.txt' } }
+    from('../THIRD_PARTY_NOTICES.md') { rename { 'Android-port-THIRD-PARTY.md' } }
+    from('../../snesrecomp/LICENSE') { rename { 'snesrecomp-LICENSE.txt' } }
+    from('../../snesrecomp/THIRD_PARTY_ATTRIBUTION.md') { rename { 'snesrecomp-THIRD-PARTY.md' } }
+    from('../../snesrecomp/third_party') {
+        include '**/LICENSE*', '**/COPYING*', '**/NOTICE*'
+        into 'snesrecomp-third-party'
+    }
+    from('../third_party/SDL2/LICENSE.txt') { rename { 'SDL2-LICENSE.txt' } }
+    from('../../snesrecomp/runner') {
+        include '**/LICENSE*', '**/license*', '**/COPYING*', '**/NOTICE*'
+        into 'snesrecomp-runner'
+    }
+}
+android.sourceSets.main.assets.srcDir(noticeDir)
+tasks.named('preBuild').configure { dependsOn prepareNotices }

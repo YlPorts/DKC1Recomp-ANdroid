@@ -5,8 +5,8 @@
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
     <!-- No INTERNET or broad storage permission: the ROM is selected with SAF. -->
     <application android:label="DKC1Recomp Android" android:theme="@style/AppTheme"
-        android:icon="@android:drawable/ic_media_play" android:allowBackup="false"
-        android:supportsRtl="true" android:hasCode="true" android:extractNativeLibs="false">
+        android:icon="@drawable/ic_launcher" android:allowBackup="false"
+        android:supportsRtl="true" android:hasCode="true">
         <activity android:name=".LauncherActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
