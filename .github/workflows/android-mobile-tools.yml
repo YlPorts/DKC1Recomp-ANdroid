@@ -1,0 +1,65 @@
+name: Android v2 private offline tool preparation
+on:
+  push:
+    branches: ['android/initial-port']
+    paths: ['.github/workflows/android-mobile-tools.yml', 'ci/offline-recipient.pem']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare pinned tools without any ROM
+        shell: bash
+        run: |
+          git show d78fe2c8e9672a75c49d01e3944691c92499d223:ci/prepare_offline.py > "$RUNNER_TEMP/prepare.py"
+          python3 "$RUNNER_TEMP/prepare.py"
+          split -b 400M -d "$RUNNER_TEMP/dkc1-offline/tools.p7m" "$RUNNER_TEMP/dkc1-offline/tools.part-"
+          cd "$RUNNER_TEMP/dkc1-offline"
+          sha256sum tools.part-* > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v2-sources
+          path: ${{ runner.temp }}/dkc1-offline/sources.tar.gz
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v2-tools-00
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-00
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v2-tools-01
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-01
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v2-tools-02
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-02
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v2-tools-03
+          path: ${{ runner.temp }}/dkc1-offline/tools.part-03
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v2-tools-checksums
+          path: ${{ runner.temp }}/dkc1-offline/SHA256SUMS.txt
+          retention-days: 1
