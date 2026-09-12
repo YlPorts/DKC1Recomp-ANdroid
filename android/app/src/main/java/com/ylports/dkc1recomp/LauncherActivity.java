@@ -50,7 +50,7 @@ public final class LauncherActivity extends Activity {
             return insets;
         });
         root.addView(text("DKC1Recomp",32,Color.WHITE));
-        root.addView(text("ANDROID · 0.1.0 DEV",13,0xffb5e37b));
+        root.addView(text("ANDROID · 0.2.0 DEV",13,0xffb5e37b));
         root.addView(text("Importa tu ROM de Donkey Kong Country USA v1.0. "
             + "El archivo se valida y queda únicamente en el almacenamiento privado de esta app.",16,0xffd6ded8));
         status=text("Comprobando archivos…",15,0xffb5e37b);root.addView(status);
@@ -62,14 +62,14 @@ public final class LauncherActivity extends Activity {
         });
         root.addView(text("Imagen",16,Color.WHITE));
         aspect=new Spinner(this);
-        String[] choices={"4:3 · original", "16:10 · experimental", "16:9 · experimental"};
+        String[] choices={"4:3 · original", "16:10 · experimental", "16:9 · experimental", "21:9 · ultrawide experimental"};
         ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,choices);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);aspect.setAdapter(adapter);
-        aspect.setSelection(Math.max(0,Math.min(2,getPreferences(MODE_PRIVATE).getInt("aspect",0))));root.addView(aspect);
+        aspect.setSelection(Math.max(0,Math.min(3,getPreferences(MODE_PRIVATE).getInt("aspect",0))));root.addView(aspect);
         play=new Button(this);play.setText("Jugar");play.setEnabled(false);root.addView(play);
         play.setOnClickListener(v->{
             int choice=aspect.getSelectedItemPosition();getPreferences(MODE_PRIVATE).edit().putInt("aspect",choice).apply();
-            String selected=choice==1 ? "16:10" : choice==2 ? "16:9" : "4:3";
+            String selected=choice==1 ? "16:10" : choice==2 ? "16:9" : choice==3 ? "21:9" : "4:3";
             startActivity(new Intent(this,GameActivity.class).putExtra("aspect",selected));
         });
         exportLog=new Button(this);exportLog.setText("Exportar diagnóstico");root.addView(exportLog);
