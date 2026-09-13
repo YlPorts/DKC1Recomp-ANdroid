@@ -17,6 +17,7 @@
 #include "input_playback.h"
 #include "desktop_audio_rate.h"
 #include "desktop_rewind.h"
+#include "desktop_sram.h"
 #include "desktop_input.h"
 #include "macos_controls.h"
 #include "macos_pause_menu.h"
@@ -73,6 +74,8 @@ enum {
 };
 
 static const double kHostPresentationFramesPerSecond = 60.0;
+static Dkc1SramStore s_sram_store;
+static int s_sram_error_reported;
 static const double kMacNativeDisplayFramesPerSecond = 120.0;
 static const double kHostWorkGuardSeconds = 0.006;
 static const double kMacSubmitLeadSeconds = 0.004;
@@ -2175,6 +2178,13 @@ int main(int argc, char **argv) {
     SDL_Quit();
     return 4;
   }
+  if (!Dkc1SramLoad(&s_sram_store, g_sram, (size_t)g_sram_size,
+                    rom_error, sizeof rom_error)) {
+    ShowError("Unable to load in-game saves", rom_error);
+    free(rom);
+    SDL_Quit();
+    return 13;
+  }
 
   if (!getenv("DKC1_BABY_KONG_ROM")) {
     char *baby_rom = Dkc1MacSavedBabyKongRom();
@@ -2448,6 +2458,12 @@ int main(int argc, char **argv) {
       s_running = 0;
       break;
     }
+    if (!Dkc1SramFlush(&s_sram_store, g_sram, (size_t)g_sram_size,
+                       false, error, sizeof error) && !s_sram_error_reported) {
+      s_sram_error_reported = 1;
+      s_paused = 1;
+      ShowError("Unable to write in-game saves", error);
+    }
     phase_start = phase_end;
     Dkc1DrawPpuFrame();
     phase_end = FramePacerNow();
@@ -2569,6 +2585,13 @@ int main(int argc, char **argv) {
   FramePacerPrintStats(&pacer);
   DisplayPacerPrintStats(&display_pacer);
   PacingLogClose(&pacing_log);
+  char save_error[256];
+  /* A failed emulation frame may contain partial cartridge writes. The last
+   * successful frame was already flushed; never persist off-rails memory. */
+  bool saved = g_fail || !Dkc1LastLleResult() ||
+      Dkc1SramFlush(&s_sram_store, g_sram, (size_t)g_sram_size,
+                    true, save_error, sizeof save_error);
+  if (!saved) ShowError("Unable to write in-game saves", save_error);
   Cleanup(rom);
-  return 0;
+  return saved ? 0 : 13;
 }

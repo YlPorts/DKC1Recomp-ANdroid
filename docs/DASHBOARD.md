@@ -1,6 +1,6 @@
 # DKC1Recomp regression dashboard
 
-Generated 2026-09-06 21:08 UTC at commit `ee6d662-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
+Generated 2026-09-13 21:49 UTC at commit `aa19639-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
 
 ## Contracts
 
@@ -40,5 +40,6 @@ _No sweep report; run `python tools/level_sweep.py`._
 | coral-capers-populated-wall-seam | open | Two supplied Coral Capers states expose opposite faces of a mismatched authored wall junction. Source-verified, default-off margin corrections are available for local playtesting. | `build/repros/water-seam-20260906/inputs/quicksave.state; frame 34978, mode 3, level $0061, entrance $00BF, camera 943/10113; right-face follow-up: build/repros/water-right-seam-20260906/inputs/quicksave.state, frame 78551, camera 671/10048` |
 | aquatic-fine-scroll-bottom-row-gap | open | Ordinary fine-Y=7 scrolling can expose a short strip of BG2 on the last scanline because the native edge tile guard row was captured only during a cache rebase. The local opt-in correction is validated; whole-game promotion remains pending. | `recipes/coral-bottom-row-guard.json from active Coral root 1eb7355de0dbc3ff8250d526611e0154fe446e590c1c1e43786a57a99e2be316; first miss at relative frame 85, absolute 110691, camera 592/10000` |
 | coral-western-alcove-margin-gaps | open | The western Coral Capers alcove and higher shaft expose right-margin gaps in unused map cells. Separate source-verified local corrections are available; full promotion remains pending. | `build/repros/water-new-junction-20260906/inputs/quicksave.state; frame 541651, mode 3, level $0061, entrance $00BF, camera 127/9797; higher shaft: build/repros/water-upper-alcove-20260906/inputs/quicksave.state, frame 553153, camera 16/9380` |
+| ingame-sram-not-persisted | fixed | Candy in-game saves existed only in process SRAM: desktop hosts never loaded or wrote a battery file, so progress disappeared on restart while save states worked. | `docs/INGAME_SAVES.md; tools/verify_ingame_saves.py with the private pre-Candy entry fixture and fixed 478-frame save input` |
 
 Issue lifecycle: edit `docs/KNOWN_ISSUES.json` (set status `fixed` with the fixing commit) and regenerate. A fixed issue regressing shows up here as its contract/sweep line failing.

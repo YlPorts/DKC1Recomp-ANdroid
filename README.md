@@ -16,6 +16,9 @@ Windows releases now include the Mac host's graphics, CRT/reconstruction,
 16:10/16:9, remapping, Assist, music and mod controls in a dark native menu and
 settings panel. See [Windows build, features and validation](docs/WINDOWS_RELEASE.md).
 
+Starting with v0.0.12 on Windows, Candy's in-game saves persist across launches.
+See [save locations, recovery and validation](docs/INGAME_SAVES.md).
+
 ## Why this game is a strong recomp candidate
 
 

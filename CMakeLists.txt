@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(dkc1_port
-    VERSION 0.0.11
+    VERSION 0.0.12
     DESCRIPTION "Native PC recompilation of Donkey Kong Country"
     LANGUAGES C)
 
@@ -67,6 +67,7 @@ if(NOT DKC1_SNESRECOMP_GEN_SOURCES)
 endif()
 
 set(DKC1_RUNNER_SOURCES
+    runner/desktop_sram.c
     runner/dkc1_game.c
     runner/dkc1_video.c
     runner/dkc1_baby_kong.c

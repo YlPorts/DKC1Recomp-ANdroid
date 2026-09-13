@@ -1,5 +1,15 @@
 # Windows SDL/OpenGL release
 
+## v0.0.12 in-game saves
+
+Candy saves now persist between launches in
+`%APPDATA%/Flat2VR/DKC1Recomp/saves/save.srm`. The host loads cartridge SRAM
+before boot and atomically writes changed data. Read/write failures are
+reported; malformed files and failed writes preserve the previous save.
+Save-state formats are unchanged. See [save recovery and validation](INGAME_SAVES.md).
+The v0.0.12 binary release is Windows x64 only; older Mac downloads still have
+the missing SRAM persistence and are not repackaged as fixed builds.
+
 The v0.0.10 Windows host shares `sdl_host.c` and the Mac host's graphics,
 audio-rate, input, refresh, rewind, CRT and color-filter models. Windows supplies
 native dark menus/settings, INI preferences, file pickers, memory mapping,

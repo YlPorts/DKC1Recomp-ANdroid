@@ -207,6 +207,16 @@
       "first_seen": "2026-09-06",
       "evidence": "docs/WIDESCREEN_WALL_SEAM.md; build/repros/water-new-junction-20260906/",
       "mitigation_note": "DKC1_WS_WALL_SEAMS=1 validates the 64-cell alcove signature plus 26 donor entries before extending the wall. Exact A/B changes 2722/8063 right-side composite pixels at 16:10/16:9; the original 256-pixel image is exact at output X15..270. Both reported empty regions pass full occupancy checks. Six routes at both aspects pass three repeats, with exact native/left pixels and guest hashes. Earlier 50-route and three-save regressions remain exact. The normal app is rebuilt and reopened at the preserved save. The middle marked join matches original ROM terrain and is unchanged. Fresh Coral entry and the complete 40-entrance floor remain unavailable. Higher-shaft follow-up: a separate 36-cell source/guard/donor check continues columns 9..11 at rows 295..298 from matching authored rows 280..282. It closes both reported holes (756/756 and 1620/1620 probe coverage), changes 3342/6640 side pixels, and preserves the entire native image at Glide output X2..257. 22 route/aspect cases pass three repeats with exact original-viewport pixels, guest hashes and audio; the actual shaft climb/return is visually verified. Higher/lower branches reach camera Y8996..10048, but the previous lower-root connection remains blocked. Four earlier saves and all 50 prior routes remain exact. Clean Coral entry and the full capability floor remain unavailable. Normal app rebuilt, signed and reopened at the higher-shaft save; actual window verified and original slot preserved."
+    },
+    {
+      "id": "ingame-sram-not-persisted",
+      "status": "fixed",
+      "summary": "Candy in-game saves existed only in process SRAM: desktop hosts never loaded or wrote a battery file, so progress disappeared on restart while save states worked.",
+      "repro": "docs/INGAME_SAVES.md; tools/verify_ingame_saves.py with the private pre-Candy entry fixture and fixed 478-frame save input",
+      "evidence": "build/save-qa/verification-4/report.json in the isolated SRAM release worktree",
+      "expected": "Cartridge-generated SRAM survives graceful exit and a cold file-select/load without a save state; failed writes preserve the previous disk image.",
+      "first_seen": "2026-09-13",
+      "fixed_note": "v0.0.12: load exact 2048-byte SRAM before boot, atomically persist changed SRAM after successful frames and at normal exit, and report I/O errors. Three native-presentation Candy barrel saves and cold restarts match explicit-import cartridge oracles and return to entrance $00FA. Comparison excludes only source-verified host PCM queue/cursors; guest CPU, DSP synthesis, WRAM/VRAM/CGRAM/OAM/SRAM remain exact. Fixture changes only the pre-entry map destination; no controller-only campaign or Mac binary validation claim."
     }
   ]
 }
