@@ -1,0 +1,25 @@
+name: Spanish mod reference source
+on:
+  push:
+    branches: ['android/initial-port']
+    paths: ['.github/workflows/es-reference.yml']
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Yoshifanatic1/Donkey-Kong-Country-1-Disassembly
+          ref: c2080f40469c716923f550706509a0d354229841
+          persist-credentials: false
+      - name: Archive public reference only
+        run: git archive --format=tar.gz HEAD > "$RUNNER_TEMP/es-reference.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: es-public-reference
+          path: ${{ runner.temp }}/es-reference.tar.gz
+          retention-days: 1
+          compression-level: 0
