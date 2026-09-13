@@ -217,6 +217,15 @@ void Dkc1MacUpdateMenuState(int paused,int fullscreen,Dkc1MacFullscreenScaling s
  for(int i=0;i<3;i++)Check(kDkc1MacMenuAspectNative+i,aspect==i);for(int i=0;i<4;i++)Check(kDkc1MacMenuEdgeReflect+i,edge==i);
  int masks[]={255,1,2,4,16};for(int i=0;i<5;i++)Check(kDkc1MacMenuLayerComposite+i,layers==masks[i]);
 }
+/* A Win32 menu bar is non-client area and stays drawn on the borderless
+ * fullscreen popup SDL creates, so it is detached for fullscreen and restored
+ * afterward. The HMENU and its checkmarks survive detachment. */
+void Dkc1WindowsShowMenuBar(int visible){
+ if(!s_window||!s_menu)return;
+ if(!!visible==(GetMenu(s_window)!=NULL))return;
+ SetMenu(s_window,visible?s_menu:NULL);DrawMenuBar(s_window);
+}
+int Dkc1WindowsMenuBarVisible(void){return s_window&&GetMenu(s_window)!=NULL;}
 void Dkc1WindowsEvent(const SDL_Event *event){(void)event;if(s_pending){int command=s_pending;s_pending=0;Dkc1MacMenuCommand(command);}}
 void Dkc1WindowsDetach(void){if(s_window){RemoveWindowSubclass(s_window,WindowProc,1);SetMenu(s_window,NULL);}if(s_menu)DestroyMenu(s_menu);if(s_font)DeleteObject(s_font);if(s_dark)DeleteObject(s_dark);s_window=NULL;s_menu=NULL;s_item_count=0;CoUninitialize();}
 
@@ -364,8 +373,14 @@ int Dkc1WindowsPlatformTest(const char *directory){
   Dkc1MacUpdateMenuState(0,0,1,selected,3,255,0,0,0,0);
   for(int i=0;i<3;i++)if(!!(GetMenuState(s_menu,kDkc1MacMenuAspectNative+i,MF_BYCOMMAND)&MF_CHECKED)!=(i==selected))return 9;
  }
+ /* Fullscreen must detach the bar without losing the menu or its state. */
+ if(!Dkc1WindowsMenuBarVisible())return 10;
+ Dkc1WindowsShowMenuBar(0);if(Dkc1WindowsMenuBarVisible()||GetMenu(s_window))return 11;
+ Dkc1MacUpdateMenuState(0,1,1,2,3,255,0,0,0,0);
+ Dkc1WindowsShowMenuBar(1);if(!Dkc1WindowsMenuBarVisible()||GetMenu(s_window)!=s_menu)return 12;
+ if(!(GetMenuState(s_menu,kDkc1MacMenuFullscreen,MF_BYCOMMAND)&MF_CHECKED)||!(GetMenuState(s_menu,kDkc1MacMenuAspect16x9,MF_BYCOMMAND)&MF_CHECKED))return 13;
  Dkc1WindowsDetach();SDL_DestroyWindow(window);
- puts("WINDOWS_PLATFORM_PASS: 23 graphics fields at min/mid/max, controls roundtrip, four dark menus, scaler/color/aspect checkmarks");return 0;
+ puts("WINDOWS_PLATFORM_PASS: 23 graphics fields at min/mid/max, controls roundtrip, four dark menus, scaler/color/aspect checkmarks, fullscreen menu bar detach/restore");return 0;
 }
 
 /* Mac display-link entry points are not selected on Windows. */

@@ -1682,12 +1682,22 @@ static void SetAspectMode(Dkc1VideoAspect requested) {
 
 static void SetFullscreen(int fullscreen) {
   s_fullscreen = fullscreen != 0;
+#ifdef _WIN32
+  /* The native menu bar would otherwise remain drawn across the top of the
+   * borderless fullscreen window and shorten the drawable. */
+  if (s_fullscreen)
+    Dkc1WindowsShowMenuBar(0);
+#endif
   if (SDL_SetWindowFullscreen(
           s_window, s_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) != 0) {
     s_fullscreen = !s_fullscreen;
     snprintf(s_status, sizeof s_status, "fullscreen change failed: %.170s",
              SDL_GetError());
   }
+#ifdef _WIN32
+  /* Restore before ApplyWindowedSize so SDL accounts for the bar height. */
+  Dkc1WindowsShowMenuBar(!s_fullscreen);
+#endif
   s_graphics.fullscreen=s_fullscreen; Dkc1MacSaveGraphics(&s_graphics);
   ApplyPresentationGeometry();
   if (!s_fullscreen)
@@ -2242,6 +2252,11 @@ int main(int argc, char **argv) {
   }
   Dkc1MacLoadControls(&s_controls);
   Dkc1MacInstallMenu();
+#ifdef _WIN32
+  /* Attaching the menu bar takes its height from the client area SDL just
+   * created; restore the integer-scaled client size beneath it. */
+  ApplyWindowedSize();
+#endif
   InitAudio();
   OpenFirstController();
 
