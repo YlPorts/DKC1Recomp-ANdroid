@@ -28,6 +28,33 @@ there is no environment switch or automatic stock-ROM mapper change.
 `tests/test_dixie_rom_mapping.py` compiles the actual resolver against synthetic
 storage; run from a compiler-equipped shell so this check is not skipped.
 
+`scripts/package_windows.py --build <CMake-build> --out <new-assets-directory>
+--version 0.0.13` packages both Windows executables, SDL2, licenses and user
+documentation from an explicit allowlist. It requires committed source, refuses
+to overwrite a ZIP, records file/build hashes in `BUILDINFO.json`, verifies ZIP
+contents and writes a SHA-256 sidecar. No ROM or private save is collected.
+
+The pinned Dixie engine also carries default-off bring-up taps:
+`SNESRECOMP_DMAQ_ZERO_WATCH=1` reports zero writes to the sprite DMA queue
+addresses with the last AOT function, and `SNESRECOMP_DMA_LOG=1` includes the
+function recorded at the DMA trigger. These are diagnostic attribution leads;
+the queue-address tap does not establish WRAM bank ownership by itself. See
+`docs/DIXIE_MOD.md`; neither tap enables the variant's compatibility behavior.
+
+Windows `--haptics-test` exercises the real rumble worker through an SDL virtual
+controller callback (pulse, disable, stop, idempotent worker start), without
+touching physical motors. CTest runs it for stock and Dixie. The Game menu has
+a persisted rumble toggle and physical test command; `DKC1_HAPTICS` overrides
+the saved `[Host] Haptics` preference at startup. `tests/test_haptics_probe.py`
+compiles the actual detector for both cartridge variants. The raw stomp trace,
+byte-grounded Dixie impulse and physical-device limitations are recorded in
+`docs/DIXIE_HAPTICS.md`. Existing WRAM dumps supply the frame evidence.
+`contracts/dixie-stomp.json` runs `recipes/dixie-stomp.dks` from clean boot,
+without a supplied state, proving grounded/falling/rebound/landing in three
+identical runs. The native test harness can optionally consume a private
+`00000-015ff` dump with arguments `<wram.bin> <expected-hit-frame>`; zero means
+no hits. It asserts exactly one hit at the named frame, or zero hits.
+
 All inject build identity (`git commit(+dirty) / config / timestamp`) shown
 in the window title, debug panel, and written to `<state>.buildinfo.json`
 sidecars; loading a state from a different build warns.

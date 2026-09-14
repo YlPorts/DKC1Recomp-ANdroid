@@ -36,8 +36,10 @@ def main():
         'LICENSE': ROOT/'LICENSE',
         'THIRD_PARTY_NOTICES.md': ROOT/'THIRD_PARTY_NOTICES.md',
         'docs/DIXIE_MOD.md': ROOT/'docs/DIXIE_MOD.md',
+        'docs/DIXIE_HAPTICS.md': ROOT/'docs/DIXIE_HAPTICS.md',
         'docs/DIXIE_MAP_FIX_2026-09-14.md': ROOT/'docs/DIXIE_MAP_FIX_2026-09-14.md',
         'docs/INGAME_SAVES.md': ROOT/'docs/INGAME_SAVES.md',
+        f'docs/RELEASE_{version}.md': ROOT/f'docs/RELEASE_{version}.md',
         'licenses/SDL-LICENSE.txt': ROOT/'third_party/windows/SDL-LICENSE.txt',
         'licenses/miniz-LICENSE.txt': ROOT/'third_party/windows/miniz-LICENSE.txt',
         'licenses/snesrecomp-LICENSE.txt': ROOT/'snesrecomp/LICENSE',
@@ -62,6 +64,11 @@ Choose Mods > Dixie Kong Country to enable Dixie. This restarts into the
 Dixie executable using the same clean ROM. The embedded IPS patch is applied
 in memory; no separate patched ROM is needed. Switch the menu item off to
 return to stock. Use View > 4:3 for the tested Dixie presentation.
+
+Game > Controller rumble (enemy stomps) turns the existing stomp feedback on
+or off and remembers your preference. Game > Test controller rumble sends a
+short test pulse to a supported controller. Feedback currently covers enemy
+stomps; it is enabled by default.
 
 Dixie includes the map sprite-addressing fix. A save made while graphics were
 corrupt can retain old graphics until leaving and re-entering the map normally.

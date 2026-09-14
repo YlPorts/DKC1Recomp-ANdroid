@@ -50,6 +50,8 @@ enum Dkc1MacMenuCommand {
   kDkc1MacMenuScreenCrt,
   kDkc1MacMenuScreenComposite,
   kDkc1MacMenuScreenTrinitron,
+  kDkc1MacMenuToggleHaptics,
+  kDkc1MacMenuTestHaptics,
   kDkc1MacMenuCommandCount
 };
 

@@ -815,6 +815,9 @@ static void UpdateWindowTitle(void) {
 }
 
 static void UpdateTitle(void) {
+#ifdef _WIN32
+  Dkc1WindowsUpdateHapticsMenu(s_haptics_enabled);
+#endif
   UpdateWindowTitle();
   Dkc1MacUpdateMenuState(s_paused, s_fullscreen,
                          s_fullscreen_scaling,
@@ -1197,7 +1200,7 @@ static int SDLCALL HapticWorkerMain(void *unused) {
 }
 
 static bool HapticWorkerStart(void) {
-  if (!s_haptics_enabled)
+  if (!s_haptics_enabled || s_haptic_worker.thread)
     return true;
   Dkc1HapticWorker *worker = &s_haptic_worker;
   worker->mutex = SDL_CreateMutex();
@@ -1270,6 +1273,45 @@ static void PulseStompHaptic(void) {
    * controller input or blocking the frame-critical thread on Bluetooth I/O. */
   HapticWorkerRequest(kHapticRequestPulse);
 }
+
+#ifdef _WIN32
+/* ROM-free output test using SDL's virtual device callback, not physical motors. */
+static SDL_atomic_t s_test_rumble_pulses, s_test_rumble_stops;
+static int SDLCALL TestRumbleCallback(void *unused, Uint16 low, Uint16 high) {
+  (void)unused;
+  if (low == 0x2800 && high == 0x5000) SDL_AtomicAdd(&s_test_rumble_pulses,1);
+  if (!low && !high) SDL_AtomicAdd(&s_test_rumble_stops,1);
+  return 0;
+}
+static int HapticOutputTest(void) {
+  SDL_VirtualJoystickDesc desc = {0};
+  desc.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION;
+  desc.type=SDL_JOYSTICK_TYPE_GAMECONTROLLER;
+  desc.naxes=SDL_CONTROLLER_AXIS_MAX;desc.nbuttons=SDL_CONTROLLER_BUTTON_MAX;
+  desc.name="DKC1 rumble output test";desc.Rumble=TestRumbleCallback;
+  int device=SDL_JoystickAttachVirtualEx(&desc), result=1;
+  if (device<0) return 1;
+  s_controller=SDL_GameControllerOpen(device);
+  if (!s_controller || !SDL_GameControllerHasRumble(s_controller)) goto done;
+  s_haptics_enabled=1;
+  if (!HapticWorkerStart() || !HapticWorkerStart()) goto done;
+  PulseStompHaptic();
+  for(int i=0;i<100 && !SDL_AtomicGet(&s_test_rumble_pulses);i++)SDL_Delay(5);
+  if(SDL_AtomicGet(&s_test_rumble_pulses)!=1)goto done;
+  s_haptics_enabled=0;StopControllerRumble();PulseStompHaptic();
+  for(int i=0;i<100 && !SDL_AtomicGet(&s_test_rumble_stops);i++)SDL_Delay(5);
+  SDL_Delay(20);
+  if(SDL_AtomicGet(&s_test_rumble_pulses)!=1 || !SDL_AtomicGet(&s_test_rumble_stops))goto done;
+  result=0;
+done:
+  HapticWorkerStop();
+  if(s_controller)SDL_GameControllerClose(s_controller);
+  s_controller=NULL;SDL_JoystickDetachVirtual(device);
+  if(!result)puts("HAPTICS_OUTPUT_PASS: real worker pulse, disable and stop reach the SDL virtual-controller driver");
+  else fprintf(stderr,"Haptics output test failed: %s\n",SDL_GetError());
+  return result;
+}
+#endif
 
 static void ControllerRemoved(SDL_JoystickID instance) {
   for (int p = 0; p < 2; p++) {
@@ -1849,6 +1891,28 @@ static void HandleKey(SDL_Keycode key, SDL_Keymod mod) {
 
 void Dkc1MacMenuCommand(int command) {
   switch (command) {
+#ifdef _WIN32
+    case kDkc1MacMenuToggleHaptics:
+      s_haptics_enabled = !s_haptics_enabled;
+      if (s_haptics_enabled && !HapticWorkerStart()) {
+        s_haptics_enabled = 0;
+        ShowError("Controller rumble", SDL_GetError());
+      }
+      if (!s_haptics_enabled) StopControllerRumble();
+      Dkc1WindowsSetHaptics(s_haptics_enabled);
+      snprintf(s_status, sizeof s_status, "controller stomp haptics %s",
+               s_haptics_enabled ? "on" : "off");
+      break;
+    case kDkc1MacMenuTestHaptics:
+      if (!s_haptics_enabled) break;
+      if (!s_controller || !SDL_GameControllerHasRumble(s_controller)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,"Controller rumble",
+            "Connect a game controller with rumble support to test enemy-stomp feedback.",s_window);
+      } else {
+        PulseStompHaptic();
+      }
+      break;
+#endif
     case kDkc1MacMenuUpscalerReconstruct:
     case kDkc1MacMenuDisplayFlat:
     case kDkc1MacMenuDisplayCrt:
@@ -2132,6 +2196,9 @@ int main(int argc, char **argv) {
   if (argc>1 && strcmp(argv[1],"--graphics-test")==0) {
     int result=Dkc1WindowsGraphicsTest(); SDL_Quit(); return result;
   }
+  if (argc>1 && strcmp(argv[1],"--haptics-test")==0) {
+    int result=HapticOutputTest(); SDL_Quit(); return result;
+  }
   if (argc==3 && strcmp(argv[1],"--platform-test")==0) {
     int result=Dkc1WindowsPlatformTest(argv[2]); SDL_Quit(); return result;
   }
@@ -2265,8 +2332,11 @@ int main(int argc, char **argv) {
 
   s_paused = EnvironmentEnabled("DKC1_START_PAUSED");
   s_fullscreen_scaling = Dkc1MacSavedFullscreenScaling();
-  s_haptics_enabled = !getenv("DKC1_HAPTICS") ||
-                      EnvironmentEnabled("DKC1_HAPTICS");
+#ifdef _WIN32
+  s_haptics_enabled = Dkc1WindowsSavedHaptics();
+#endif
+  if (getenv("DKC1_HAPTICS"))
+    s_haptics_enabled = EnvironmentEnabled("DKC1_HAPTICS");
   if (!HapticWorkerStart()) {
     fprintf(stderr, "warning: haptic worker unavailable: %s\n",
             SDL_GetError());

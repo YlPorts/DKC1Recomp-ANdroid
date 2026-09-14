@@ -1,13 +1,14 @@
 # DKC1Recomp regression dashboard
 
-Generated 2026-09-14 05:24 UTC at commit `00dc00a-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
+Generated 2026-09-14 05:58 UTC at commit `1d722d9-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
 
 ## Contracts
 
 | contract | last result | legs | evidence |
 |---|---|---|---|
-| dixie-jungle (`dixie-jungle.json`) | PASS | entry+quickload | `D:\RQ-Engine\DKC1Recomp\build\dixie-map-fix-20260914\regression\dixie-jungle` |
-| dixie-map-refresh (`dixie-map-refresh.json`) | PASS | entry | `D:\RQ-Engine\DKC1Recomp\build\dixie-map-fix-20260914\map-regression\dixie-map-refresh` |
+| dixie-jungle (`dixie-jungle.json`) | PASS | entry+quickload | `D:\RQ-Engine\DKC1Recomp\build\release-v0.0.13\regression\dixie-jungle` |
+| dixie-map-refresh (`dixie-map-refresh.json`) | PASS | entry | `D:\RQ-Engine\DKC1Recomp\build\release-v0.0.13\map-regression\dixie-map-refresh` |
+| dixie-stomp (`dixie-stomp.json`) | PASS | entry | `D:\RQ-Engine\DKC1Recomp\build\release-v0.0.13\stomp-regression\dixie-stomp` |
 | jungle-death-transition (`jungle-death-transition.json`) | NOT RUN in latest cycle | - | - |
 | jungle-entry (`jungle-entry.json`) | NOT RUN in latest cycle | - | - |
 
@@ -19,6 +20,7 @@ _No sweep report; run `python tools/level_sweep.py`._
 
 | id | status | summary | repro |
 |---|---|---|---|
+| dixie-stomp-haptics | fixed | Dixie enemy stomps produce no feedback because the host compares her rebound to stock DK's value; the Windows host also lacks visible rumble controls. | `contracts/dixie-stomp.json: fresh boot, falling at frame 7749, stomp at 7750. Equivalent immutable Jungle-state route reaches the stomp at relative frame 149.` |
 | dixie-map-sprite-corruption | fixed | The optional Dixie variant shows conspicuous garbage sprite clusters on Kongo Jungle and Jungle entrance maps, including after death. Fresh controller-only boot reproduces it; Jungle gameplay is clean in the inspected movement branches. | `Dixie headless, native mode, first 5750 frames of recipes/dixie-jungle-startup.dks from the verified clean ROM; tracked Jungle-map OAM cluster begins at frame 5728, with earlier corruption on the preceding map.` |
 | sdl-startup-route-oam-port-timing | fixed | Input-only SDL startup routes skipped the per-frame drawing/HDMA/VBlank step, leaving PPU OAM uploads misaligned and visibly corrupting both stock and Dixie sprites at first interactive presentation. | `DKC1_STARTUP_SCRIPT=recipes/dixie-jungle-startup.dks, native mode, clean boot; Dixie first interactive frame 7602.` |
 | dixie-windows-relaunch-integration | fixed | Dixie menu restarts lost the selected ROM path and the SDL variant could return to the debugger filename; the regular Windows build lacked a matching SDL variant target. | `Toggle Mods > Dixie Kong Country in both Windows hosts with a clean ROM path containing spaces; also start SDL with a persisted choice and cached ROM.` |

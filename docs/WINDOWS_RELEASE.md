@@ -1,5 +1,8 @@
 # Windows SDL/OpenGL release
 
+Current Windows release: [v0.0.13, Dixie Kong update](RELEASE_0.0.13.md).
+The sections below retain the earlier host validation history.
+
 ## v0.0.12 in-game saves
 
 Candy saves now persist between launches in
@@ -53,6 +56,9 @@ Alt+Enter toggles fullscreen. Game/View/Mods/Music expose the native dropdowns.
 The menu bar is detached while fullscreen and reattached on return to windowed
 mode, so the borderless fullscreen drawable covers the whole display.
 Settings are in `%APPDATA%/Flat2VR/DKC1Recomp/windows.ini`, beside user states.
+The Game menu exposes **Controller rumble (enemy stomps)** and a test pulse.
+It defaults on and persists under `[Host] Haptics`; `DKC1_HAPTICS=0/1`
+overrides that preference at startup. See [the Dixie haptics fix](DIXIE_HAPTICS.md).
 `DKC1_USER_DIR` redirects both Windows settings and states to an existing
 absolute private directory. It does not modify Mac NSUserDefaults.
 

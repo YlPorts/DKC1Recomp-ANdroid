@@ -2,6 +2,16 @@
   "schema": "dkc1.known-issues.v1",
   "issues": [
     {
+      "id": "dixie-stomp-haptics",
+      "status": "fixed",
+      "summary": "Dixie enemy stomps produce no feedback because the host compares her rebound to stock DK's value; the Windows host also lacks visible rumble controls.",
+      "repro": "contracts/dixie-stomp.json: fresh boot, falling at frame 7749, stomp at 7750. Equivalent immutable Jungle-state route reaches the stomp at relative frame 149.",
+      "expected": "Recognize the pinned variant's accepted rebound and expose a persistent on/off setting and controller test.",
+      "first_seen": "2026-09-14",
+      "evidence": "docs/DIXIE_HAPTICS.md; build/release-v0.0.13/haptics/; build/release-v0.0.13/stomp-regression.json; haptics-ctest.log; haptics-unittest.log",
+      "fixed_note": "Select $0900 only for DKC1_DIXIE_VARIANT, grounded in the pinned bytes at BF:A79F and consecutive WRAM frames. Preserve stock $0720, Diddy $0880 and all existing guards. The real detector recognizes exactly one hit in the 300-frame trace. Three fresh-boot stomp/landing runs are byte-identical with lives preserved. Both SDL variants pass actual worker-to-virtual-controller pulse/disable/stop tests; platform tests cover preference persistence and menu state. No controller was connected during device inspection, so physical vibration remains unverified. No guest state or save format changes."
+    },
+    {
       "id": "dixie-map-sprite-corruption",
       "status": "fixed",
       "summary": "The optional Dixie variant shows conspicuous garbage sprite clusters on Kongo Jungle and Jungle entrance maps, including after death. Fresh controller-only boot reproduces it; Jungle gameplay is clean in the inspected movement branches.",

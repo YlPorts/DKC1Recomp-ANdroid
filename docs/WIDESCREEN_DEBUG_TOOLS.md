@@ -12,6 +12,14 @@ immutable exact-state/fresh-entry evidence are in
 `contracts/dixie-map-refresh.json` requires that report's preserved root via
 `DKC1_SAVESTATE_INPUT`; it verifies normal map reload, resources and navigation
 with three identical native replays. It does not promote widescreen coverage.
+The [v0.0.13 release record](RELEASE_0.0.13.md) adds extracted-package graphics,
+Dixie level-entry and stock cartridge-save/cold-restart verification. The
+canonical catalog documents the allowlisted Windows packager and the optional
+DMA attribution taps included in the pinned engine.
+`contracts/dixie-stomp.json` adds fresh-boot stomp and landing closure.
+The Windows `--haptics-test` uses the actual worker and an SDL virtual device
+to verify pulse/disable/stop without physical motors. See
+[`DIXIE_HAPTICS.md`](DIXIE_HAPTICS.md) for ROM-byte, recorded-frame and UI tests.
 
 Windows v0.0.12 adds `verify_ingame_saves.py` for three-repeat SRAM persistence
 and cold-restart checks. Its isolated user-directory contract, audio comparison

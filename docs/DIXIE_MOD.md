@@ -12,7 +12,7 @@ for the earlier launch/build fixes and gameplay coverage.
 This document is the durable record for porting the "Dixie Kong Country" IPS
 ROM hack (user-supplied, `C:\Users\ellio\Downloads\Dixie Kong Country\Dixie Kong Country.ips`)
 into the native recomp. Stock DKC1 behavior, hashes, and the stock evidence
-chain remain separate. The earlier port depends on an uncommitted engine DMA
+chain remain separate. The earlier port depends on a variant-only engine DMA
 workaround described below. The September 14 map fix also changes the shared
 cartridge resolver, with its expanded mapping enabled only by the Dixie variant.
 
@@ -170,11 +170,16 @@ described by `reference/README.md`.
    `snes/dma.c`; the sprite queue's zero-size entries become no-ops and
    the intended 896-byte frame uploads proceed.
 
-That workaround remains a compatibility dependency in the existing dirty
-engine submodule. Both QA passes preserved it unchanged. It did not resolve
+That workaround remains a compatibility dependency. Both QA passes preserved
+its behavior; v0.0.13 pins it together with the map resolver in engine commit
+`de94587464524ebac8dcd62e14618bf0d3953644`. It did not resolve
 the map sprite corruption; the independently proven mapping correction above
 does. No general hardware-accuracy or whole-game claim follows from these
 targeted results.
+
+The [v0.0.13 release record](RELEASE_0.0.13.md) covers the published Windows
+package and retained v0.0.12 save-persistence integration. The paired Mac
+archive is the unchanged v0.0.9 build and does not contain Dixie.
 ## Non-goals (v1)
 
 - Widescreen for the mod build (stock presentation).

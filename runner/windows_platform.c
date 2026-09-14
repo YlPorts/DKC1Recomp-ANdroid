@@ -68,6 +68,8 @@ static void WriteInt(const wchar_t *section,const char *name,int value){
  ConfigPath();wchar_t key[128],text[32];MultiByteToWideChar(CP_UTF8,0,name,-1,key,128);
  swprintf_s(text,32,L"%d",value);WritePrivateProfileStringW(section,key,text,s_config);
 }
+int Dkc1WindowsSavedHaptics(void){return ReadInt(L"Host","Haptics",1)!=0;}
+void Dkc1WindowsSetHaptics(int enabled){WriteInt(L"Host","Haptics",enabled!=0);}
 static char *ReadPath(const wchar_t *key){
  ConfigPath();wchar_t path[4096];GetPrivateProfileStringW(L"Paths",key,L"",path,4096,s_config);
  if(!path[0])return NULL;char *out=malloc(16384);if(out)WideCharToMultiByte(CP_UTF8,0,path,-1,out,16384,NULL,NULL);return out;
@@ -194,6 +196,8 @@ static HMENU Sub(HMENU parent,const wchar_t *text){HMENU menu=CreatePopupMenu();
 void Dkc1MacInstallMenu(void){
  s_menu=CreateMenu();HMENU game=Sub(s_menu,L"&Game"),view=Sub(s_menu,L"&View"),mods=Sub(s_menu,L"&Mods"),music=Sub(s_menu,L"&Music");
  Add(game,kDkc1MacMenuPauseMenu,L"&Pause / Settings\tEsc");Add(game,kDkc1MacMenuControls,L"&Controls and Assist...");
+ Add(game,kDkc1MacMenuToggleHaptics,L"Controller &rumble (enemy stomps)");
+ Add(game,kDkc1MacMenuTestHaptics,L"&Test controller rumble");
  Add(game,kDkc1MacMenuPause,L"Pause / Resume\tF7");Add(game,kDkc1MacMenuStep,L"Step one frame\tF8");
  Add(game,kDkc1MacMenuQuickSave,L"Quick &Save\tF11");Add(game,kDkc1MacMenuQuickLoad,L"Quick &Load\tF12");Add(game,kDkc1MacMenuExportRepro,L"Export repro bundle\tF9");Add(game,kDkc1MacMenuQuit,L"&Quit\tAlt+F4");
  Add(view,kDkc1MacMenuGraphics,L"&Graphics Settings...");Add(view,kDkc1MacMenuFullscreen,L"&Fullscreen\tAlt+Enter");
@@ -208,6 +212,11 @@ void Dkc1MacInstallMenu(void){
  ThemeMenu(s_menu,1);SetMenu(s_window,s_menu);DrawMenuBar(s_window);
 }
 static void Check(int id,int checked){CheckMenuItem(s_menu,id,MF_BYCOMMAND|(checked?MF_CHECKED:MF_UNCHECKED));}
+void Dkc1WindowsUpdateHapticsMenu(int enabled){
+ if(!s_menu)return;
+ Check(kDkc1MacMenuToggleHaptics,enabled);
+ EnableMenuItem(s_menu,kDkc1MacMenuTestHaptics,MF_BYCOMMAND|(enabled?MF_ENABLED:MF_GRAYED));
+}
 void Dkc1MacUpdateGraphicsMenuState(int display,int upscaler,int screen){
  Check(kDkc1MacMenuDisplayFlat,!display);Check(kDkc1MacMenuDisplayCrt,display);
  int scalers[]={kDkc1MacMenuFullscreenPixelSharp,kDkc1MacMenuFullscreenSmooth,kDkc1MacMenuUpscalerReconstruct,kDkc1MacMenuFullscreenSharpBilinear};
@@ -363,6 +372,13 @@ int Dkc1WindowsPlatformTest(const char *directory){
  SDL_Window *window=SDL_CreateWindow("Synthetic menu test",0,0,400,300,SDL_WINDOW_HIDDEN);
  if(!window)return 5;Dkc1WindowsAttach(window);Dkc1MacInstallMenu();
  if(GetMenuItemCount(s_menu)!=4)return 6;
+ if(!Dkc1WindowsSavedHaptics())return 15;
+ for(int enabled=0;enabled<2;enabled++){
+  Dkc1WindowsSetHaptics(enabled);if(Dkc1WindowsSavedHaptics()!=enabled)return 16;
+  Dkc1WindowsUpdateHapticsMenu(enabled);
+  if(!!(GetMenuState(s_menu,kDkc1MacMenuToggleHaptics,MF_BYCOMMAND)&MF_CHECKED)!=enabled)return 17;
+  if(!!(GetMenuState(s_menu,kDkc1MacMenuTestHaptics,MF_BYCOMMAND)&MF_GRAYED)==enabled)return 18;
+ }
  const int scalers[]={kDkc1MacMenuFullscreenPixelSharp,kDkc1MacMenuFullscreenSmooth,kDkc1MacMenuUpscalerReconstruct,kDkc1MacMenuFullscreenSharpBilinear};
  for(int selected=0;selected<4;selected++){
   Dkc1MacUpdateGraphicsMenuState(selected&1,selected,selected);
