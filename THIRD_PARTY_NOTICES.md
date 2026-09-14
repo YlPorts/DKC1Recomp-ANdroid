@@ -1,8 +1,10 @@
 # Third-party notices
 
-DKC1Recomp does not contain or distribute a Donkey Kong Country ROM, generated
-ROM-derived source, save states, extracted game assets, screenshots, or audio.
-Users must provide the supported ROM themselves.
+DKC1Recomp does not distribute a Donkey Kong Country ROM, generated game
+source, private save states, screenshots, or audio. Users must provide the
+supported ROM themselves. The optional Dixie variant embeds the user-selected
+Dixie Kong Country IPS patch and applies it only to the verified clean ROM;
+see [the patch provenance and integration record](docs/DIXIE_MOD.md).
 
 Windows adds unmodified SDL 2.30.9 (zlib) and miniz 3.0.2 (MIT).
 Exact revisions, uses and complete license texts are recorded under

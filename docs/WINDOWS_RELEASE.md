@@ -44,7 +44,7 @@ No ROM, extracted assets or private state belongs in the release ZIP.
 | Controls | Both players' keyboard/gamepad bindings, source routing and analog deadzones; controller pause navigation |
 | Assist / states | Opt-in rewind, 3x fast-forward, four remappable host actions, five independent state slots |
 | Sound | Canonical game audio, host-only drift correction, mute/volume; MSU-1 folder or bounded `.msu1`/ZIP import |
-| Mods | Verified private DKC3-ROM Baby Kong source; original animation/movement code; saved enable state |
+| Mods | v0.0.13: optional Dixie Kong Country sibling, verified clean DKC1-ROM synthesis, saved enable state; replaces the previous Baby Kong menu option |
 | Aquatic presentation | Same five experimental flags; saved opt-in applies next launch and remains off by default |
 
 Escape opens the pause panel (exits fullscreen first), F7 pauses/resumes, F8

@@ -5,7 +5,7 @@ if errorlevel 1 exit /b 1
 cd /d "%~dp0build\hostobj_tools"
 set DEFS=/DSNESRECOMP_TRACE=0 /DSNESRECOMP_REVERSE_DEBUG=0 /DSNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1 /DSYSTEM_VOLUME_MIXER_AVAILABLE=0 /D_CRT_SECURE_NO_WARNINGS
 set INCS=/I..\..\snesrecomp\runner\src /I..\..\snesrecomp\runner\src\snes /I..\..\recomp /I..\..\runner
-cl /nologo /c /W0 /O1 %DEFS% %INCS% /Fo:dkc1_video.obj ..\..\runner\desktop_sram.c ..\..\runner\dkc1_video.c
+cl /nologo /c /W0 /O1 %DEFS% %INCS% /Fo:dkc1_video.obj ..\..\runner\dkc1_video.c
 if errorlevel 1 exit /b 1
 cl /nologo /c /W0 /O1 %DEFS% %INCS% /Fo:dkc1_baby_kong.obj ..\..\runner\dkc1_baby_kong.c
 if errorlevel 1 exit /b 1
