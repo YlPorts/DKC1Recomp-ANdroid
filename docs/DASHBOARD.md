@@ -1,11 +1,13 @@
 # DKC1Recomp regression dashboard
 
-Generated 2026-09-06 21:08 UTC at commit `ee6d662-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
+Generated 2026-09-14 04:44 UTC at commit `aa19639-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
 
 ## Contracts
 
 | contract | last result | legs | evidence |
 |---|---|---|---|
+| dixie-jungle (`dixie-jungle.json`) | PASS | entry+quickload | `D:\RQ-Engine\DKC1Recomp\build\dixie-map-fix-20260914\regression\dixie-jungle` |
+| dixie-map-refresh (`dixie-map-refresh.json`) | PASS | entry | `D:\RQ-Engine\DKC1Recomp\build\dixie-map-fix-20260914\map-regression\dixie-map-refresh` |
 | jungle-death-transition (`jungle-death-transition.json`) | NOT RUN in latest cycle | - | - |
 | jungle-entry (`jungle-entry.json`) | NOT RUN in latest cycle | - | - |
 
@@ -17,6 +19,9 @@ _No sweep report; run `python tools/level_sweep.py`._
 
 | id | status | summary | repro |
 |---|---|---|---|
+| dixie-map-sprite-corruption | fixed | The optional Dixie variant shows conspicuous garbage sprite clusters on Kongo Jungle and Jungle entrance maps, including after death. Fresh controller-only boot reproduces it; Jungle gameplay is clean in the inspected movement branches. | `Dixie headless, native mode, first 5750 frames of recipes/dixie-jungle-startup.dks from the verified clean ROM; tracked Jungle-map OAM cluster begins at frame 5728, with earlier corruption on the preceding map.` |
+| sdl-startup-route-oam-port-timing | fixed | Input-only SDL startup routes skipped the per-frame drawing/HDMA/VBlank step, leaving PPU OAM uploads misaligned and visibly corrupting both stock and Dixie sprites at first interactive presentation. | `DKC1_STARTUP_SCRIPT=recipes/dixie-jungle-startup.dks, native mode, clean boot; Dixie first interactive frame 7602.` |
+| dixie-windows-relaunch-integration | fixed | Dixie menu restarts lost the selected ROM path and the SDL variant could return to the debugger filename; the regular Windows build lacked a matching SDL variant target. | `Toggle Mods > Dixie Kong Country in both Windows hosts with a clean ROM path containing spaces; also start SDL with a persisted choice and cached ROM.` |
 | no-contact-damage | fixed | Contact damage never lands: DK overlaps the first Gnawty for 3800+ frames unharmed in BOTH native and wide modes, and identically under forced LLE (not a dispatch/widescreen defect). | `recipes/route_death.dks` |
 | entry-wide-centered-flap | open | WIDE<->CENTERED presentation flap during level entry (frames 7304-7331 of the jungle route). | `recipes/route_jungle.dks with DKC1_WS_TRACE` |
 | wide-world-key-unwrap | open | Wide world key camX=$FFF0 (-16) unwrap artifact near level start. | `recipes/route_jungle.dks with DKC1_WS_TRACE` |

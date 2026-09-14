@@ -1,5 +1,18 @@
 # Widescreen debug tooling plan
 
+Optional Dixie verification uses the existing native route runner with
+`contracts/dixie-jungle.json` and `build/dkc1_dixie_headless.exe`; do not run
+its patched cartridge through the stock host or assume that a native pass
+promotes widescreen. `build_host_dixie.bat`, `build_host_dixie_tools.bat`, and
+the opt-in CMake `DKC1_BUILD_DIXIE_VARIANT` SDL sibling are documented in
+[`DIXIE_MOD.md`](DIXIE_MOD.md). Historical failures are recorded in
+[`DIXIE_QA_2026-09-13.md`](DIXIE_QA_2026-09-13.md). The map mapping fix and
+immutable exact-state/fresh-entry evidence are in
+[`DIXIE_MAP_FIX_2026-09-14.md`](DIXIE_MAP_FIX_2026-09-14.md).
+`contracts/dixie-map-refresh.json` requires that report's preserved root via
+`DKC1_SAVESTATE_INPUT`; it verifies normal map reload, resources and navigation
+with three identical native replays. It does not promote widescreen coverage.
+
 Windows v0.0.10 exposes the shared SDL host diagnostics and three ROM-free
 CTest targets. See the Windows section of the canonical tool catalog and
 [`WINDOWS_RELEASE.md`](WINDOWS_RELEASE.md). This does not promote a new

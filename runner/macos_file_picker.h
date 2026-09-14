@@ -20,6 +20,8 @@ enum Dkc1MacMenuCommand {
   kDkc1MacMenuExportRepro,
   kDkc1MacMenuToggleBabyKong,
   kDkc1MacMenuChooseBabyKongRom,
+  kDkc1MacMenuToggleDixie,
+  kDkc1MacMenuChooseDixieRom,
   kDkc1MacMenuChooseMusicPack,
   kDkc1MacMenuDisableMusicPack,
   kDkc1MacMenuFullscreen,
@@ -54,12 +56,16 @@ enum Dkc1MacMenuCommand {
 /* Returns a malloc-owned UTF-8 path, or NULL when the panel is cancelled. */
 char *Dkc1MacChooseRom(void);
 
-/* Baby Kong uses a user-owned DKC3 ROM as its in-memory sprite source. */
-char *Dkc1MacChooseBabyKongRom(void);
+/* Baby Kong (Kiddy) was removed from the Mods menu; its persistence helpers
+ * remain for old settings files but nothing activates the mod anymore. */
 char *Dkc1MacSavedBabyKongRom(void);
 void Dkc1MacSetBabyKongRom(const char *path);
 int Dkc1MacSavedBabyKongEnabled(void);
 void Dkc1MacSetBabyKongEnabled(int enabled);
+
+/* Dixie Kong Country is built in: no ROM to pick, nothing to persist beyond
+ * the on/off setting (dkc1_dixie_mod.h). Toggling restarts into the variant
+ * executable, which synthesizes the modded image from the clean ROM. */
 
 /* Selects an extracted MSU-1 directory or extracts a .msu1 archive into the
  * app's Application Support directory, saves the selection, and returns a
@@ -87,7 +93,7 @@ void Dkc1MacUpdateMenuState(int paused, int fullscreen,
                             Dkc1VideoAspect aspect, Dkc1EdgePolicy edge,
                             unsigned char layer_mask, int provenance,
                             int replacement_music, int baby_kong_enabled,
-                            int baby_kong_ready);
+                            int baby_kong_ready, int dixie_enabled);
 void Dkc1MacMenuCommand(int command);
 
 /* Runs a display-linked cadence source on a private run loop. The SDL host

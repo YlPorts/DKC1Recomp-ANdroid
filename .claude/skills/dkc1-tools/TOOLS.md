@@ -9,11 +9,24 @@ paths are repo-relative. `<rom>` = headerless DKC1 USA v1.0.
 |---|---|
 | `build_host_tools.bat` | Isolated tool-session build (own obj dir/exe names, never contends with the primary session): `build/dkc1_headless_tools.exe`, `dkc1_desktop_tools.exe`, `dkc1_layer_capture.exe` |
 | `build_host.bat` | Primary build: `dkc1_snesrecomp_headless.exe`, `dkc1_desktop.exe` |
+| `build_host_dixie.bat` / `build_host_dixie_tools.bat` | Optional Dixie debugger/headless variants; use a clean ROM, native presentation, and `contracts/dixie-jungle.json`. See `docs/DIXIE_MOD.md` for the SDL sibling and validated scope. |
 | `build_host_noadapt.bat` | Builds from a generated tree WITHOUT the widescreen adapters (`build/gen_noadapt`) — the no-adapter oracle used to prove adapter inertness |
 | `build_phaseguard_headless.bat` | Prefetch-phase-guard instrumented headless |
 | `rebuild_widescreen_runtime.bat` | Regenerate + rebuild after recomp/cfg changes |
 | `link_desktop_candidate.bat` / `rebuild_diagnostics_candidate.bat` | Link/rebuild under candidate exe names while a running visible exe holds the standard name |
 | `build/link_desktop_retry.bat` | Link tool-session desktop to `_new` name, then retry the standard name |
+
+`contracts/dixie-map-refresh.json` uses `recipes/dixie-map-refresh.dks` with
+`DKC1_SAVESTATE_INPUT` pointing to the immutable September 14 tester root
+(SHA-256 and commands in `docs/DIXIE_MAP_FIX_2026-09-14.md`). It checks three
+native map checkpoints over three identical replays and saves
+`refreshed_map.state` per repeat. This is a controller-only entry/exit refresh,
+not a general save repair or a clean-boot route. Preserve the original root
+outside normal slots. The variant's bounded expanded-ROM data-bank mapping is
+host cartridge configuration, enabled only by its verified loader/initializer;
+there is no environment switch or automatic stock-ROM mapper change.
+`tests/test_dixie_rom_mapping.py` compiles the actual resolver against synthetic
+storage; run from a compiler-equipped shell so this check is not skipped.
 
 All inject build identity (`git commit(+dirty) / config / timestamp`) shown
 in the window title, debug panel, and written to `<state>.buildinfo.json`
@@ -42,8 +55,10 @@ sidecars; loading a state from a different build warns.
 inward clamp released over eight margins of travel, `reflect`, `bars`,
 `shift` = pre-policy inward clamp, the A/B reference for wall reports),
 `DKC1_SCRIPT` (route .dks), `SNESRECOMP_INPUT_PLAY` (raw input replay),
-`DKC1_STARTUP_SCRIPT` (macOS input/wait-only .dks route run unthrottled before
-the first interactive frame; state and checkpoint directives fail closed),
+`DKC1_STARTUP_SCRIPT` (SDL Windows/macOS input/wait-only .dks route run
+unthrottled before the first interactive frame; state and checkpoint directives
+fail closed; each frame includes HDMA/render/VBlank; the native startup oracle
+is `recipes/dixie-jungle-startup.dks`, see `docs/DIXIE_QA_2026-09-13.md`),
 `DKC1_ALLOW_ROM_SHA256` (development-only exact 4 MB modified-ROM pin;
 retail verification remains the default and malformed/non-matching pins fail),
 `DKC1_SAVESTATE_INPUT` (load state at boot), `DKC1_SAVESTATE_OUTPUT` /

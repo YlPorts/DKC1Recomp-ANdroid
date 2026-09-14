@@ -1,4 +1,6 @@
 #include "dkc1_blank_scan.h"
+#include "dkc1_dixie_mod.h"
+#include "snes/dma.h"
 #include "dkc1_invariant_monitor.h"
 #include "dkc1_game.h"
 #include "dkc1_video.h"
@@ -98,6 +100,24 @@ int main(int argc, char **argv) {
     Dkc1MakeDir("build/tier2");
     Dkc1SetEnv("SNESRECOMP_TIER2_DIR", "build/tier2");
   }
+  /* Optional Dixie Kong Country mod: with the setting on (registry) or
+   * DKC1_DIXIE=1/DKC1_DIXIE_ROM in the environment, this stock build hands
+   * the session to the variant headless executable before touching the ROM. */
+  {
+    char note[192];
+    if (Dkc1DixieHandoffCheck(argc, argv, "dkc1_dixie_headless.exe", note,
+                              sizeof note)) {
+      return 0; /* the variant executable owns the session */
+    }
+    if (note[0]) fprintf(stderr, "dixie mod: %s\n", note);
+
+#ifdef DKC1_DIXIE_VARIANT
+  /* The mod's sprite-DMA queue emits zero-size entries that the
+   * hack's target emulator dropped; guard VRAM from the stomps.
+   * (See dma_set_zero_size_vram_noop in snes/dma.h.) */
+  dma_set_zero_size_vram_noop(1);
+#endif
+  }
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "usage: dkc1_snesrecomp_headless <rom.sfc> [frames]\n");
     return 2;
@@ -110,8 +130,15 @@ int main(int argc, char **argv) {
 
   size_t rom_size = 0;
   char rom_error[160];
+#ifdef DKC1_DIXIE_VARIANT
+  /* The variant synthesizes the modded ROM image from the clean ROM
+   * argument (no patched-ROM file needed). */
+  uint8_t *rom =
+      Dkc1DixieLoadRom(argv[1], &rom_size, rom_error, sizeof rom_error);
+#else
   uint8_t *rom =
       Dkc1ReadVerifiedRom(argv[1], &rom_size, rom_error, sizeof rom_error);
+#endif
   if (!rom) {
     fprintf(stderr, "%s: %s\n", rom_error, argv[1]);
     return 2;

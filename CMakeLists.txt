@@ -72,6 +72,7 @@ set(DKC1_RUNNER_SOURCES
     runner/dkc1_baby_kong.c
     runner/dkc1_baby_kong_animation.c
     runner/dkc1_baby_kong_movement.c
+    runner/dkc1_dixie_mod.c
     runner/dkc1_margin_proxy.c
     runner/dkc1_ws_trace.c
     runner/input_playback.c
@@ -188,13 +189,14 @@ if(APPLE)
 endif()
 
 if(WIN32)
-    add_executable(dkc1_windows ${DKC1_ENGINE_SOURCES} ${DKC1_SNESRECOMP_GEN_SOURCES}
-        ${DKC1_RUNNER_SOURCES} runner/headless_host.c runner/sdl_host.c
+    set(DKC1_WINDOWS_HOST_SOURCES runner/headless_host.c runner/sdl_host.c
         runner/dkc1_haptics.c runner/dkc1_msu1.c runner/desktop_audio_rate.c
         runner/desktop_rewind.c runner/desktop_input.c runner/desktop_refresh.c
         runner/desktop_crt.c runner/desktop_filter.c runner/desktop_graphics.c
         runner/windows_platform.c runner/windows_graphics.c runner/windows_music_pack.c
         ${CMAKE_CURRENT_BINARY_DIR}/windows_shaders.h)
+    add_executable(dkc1_windows ${DKC1_ENGINE_SOURCES} ${DKC1_SNESRECOMP_GEN_SOURCES}
+        ${DKC1_RUNNER_SOURCES} ${DKC1_WINDOWS_HOST_SOURCES})
     target_include_directories(dkc1_windows PRIVATE runner recomp
         ${SNESRECOMP_RUNNER_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(dkc1_windows PRIVATE SDL_MAIN_HANDLED
@@ -209,6 +211,31 @@ if(WIN32)
     add_custom_command(TARGET dkc1_windows POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2>
             $<TARGET_FILE_DIR:dkc1_windows>)
+    option(DKC1_BUILD_DIXIE_VARIANT "Build the optional Dixie SDL sibling" OFF)
+    if(DKC1_BUILD_DIXIE_VARIANT)
+        file(GLOB DKC1_DIXIE_GEN_SOURCES CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/generated/snesrecomp_dixie/*.c")
+        if(NOT DKC1_DIXIE_GEN_SOURCES)
+            message(FATAL_ERROR "Generate the private Dixie sources first; see docs/DIXIE_MOD.md")
+        endif()
+        add_executable(dkc1_windows_dixie ${DKC1_ENGINE_SOURCES}
+            ${DKC1_DIXIE_GEN_SOURCES} ${DKC1_RUNNER_SOURCES} ${DKC1_WINDOWS_HOST_SOURCES})
+        target_include_directories(dkc1_windows_dixie PRIVATE runner recomp/dixie recomp
+            ${SNESRECOMP_RUNNER_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
+        target_compile_definitions(dkc1_windows_dixie PRIVATE SDL_MAIN_HANDLED
+            DKC1_DIXIE_VARIANT=1 SNESRECOMP_TRACE=0 SNESRECOMP_REVERSE_DEBUG=0
+            SNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1 SYSTEM_VOLUME_MIXER_AVAILABLE=0
+            _CRT_SECURE_NO_WARNINGS DKC1_BUILD_COMMIT="${DKC1_BUILD_COMMIT}"
+            DKC1_BUILD_CONFIG="windows-dixie-${PROJECT_VERSION}")
+        target_link_libraries(dkc1_windows_dixie PRIVATE ${SNESRECOMP_RUNNER_LIBRARIES}
+            SDL2::SDL2 miniz opengl32 dwmapi comctl32 comdlg32 shell32 ole32 uuid gdi32)
+        set_target_properties(dkc1_windows_dixie PROPERTIES
+            OUTPUT_NAME dkc1_dixie_desktop WIN32_EXECUTABLE TRUE)
+        target_link_options(dkc1_windows_dixie PRIVATE /ENTRY:mainCRTStartup)
+        add_custom_command(TARGET dkc1_windows_dixie POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2>
+                $<TARGET_FILE_DIR:dkc1_windows_dixie>)
+    endif()
     enable_testing()
     add_test(NAME windows_graphics COMMAND dkc1_windows --graphics-test)
     set_tests_properties(windows_graphics PROPERTIES TIMEOUT 60)

@@ -6,6 +6,8 @@
  */
 #include "dkc1_blank_scan.h"
 #include "dkc1_baby_kong.h"
+#include "dkc1_dixie_mod.h"
+#include "snes/dma.h"
 #include "dkc1_debug_dump.h"
 #include "dkc1_flight_recorder.h"
 #include "dkc1_game.h"
@@ -240,6 +242,13 @@ static int RunStartupScript(char *error, size_t error_size) {
   if (!Dkc1ScriptLoad(path, error, error_size))
     return 0;
 
+  /* Rendering also executes HDMA and the VBlank OAM-port reload. Skipping it
+   * during a fast startup misaligns subsequent OAM uploads even though WRAM
+   * and VRAM still match the normal frame loop. Use an offscreen buffer until
+   * InitVideo creates the window. */
+  s_width = Dkc1VideoWidth();
+  Dkc1BeginDrawing(s_pixels, (size_t)s_width * 4);
+
   const long frame_limit = 30000;
   long frames = 0;
   while (!Dkc1ScriptFinished()) {
@@ -274,6 +283,7 @@ static int RunStartupScript(char *error, size_t error_size) {
       Dkc1ScriptFree();
       return 0;
     }
+    Dkc1DrawPpuFrame();
   }
   Dkc1ScriptFree();
   fprintf(stderr, "startup: completed %s in %ld frames\n", path, frames);
@@ -808,7 +818,8 @@ static void UpdateTitle(void) {
                          Dkc1VideoGetAspect(), Dkc1VideoGetEdgePolicy(),
                          Dkc1DebugLayerMask(),
                          Dkc1DebugProvenanceOverlay(), s_msu1 != NULL,
-                         Dkc1BabyKongEnabled(), Dkc1BabyKongReady());
+                         0, 0,  /* Baby Kong removed from the Mods menu */
+                         Dkc1DixieIsVariant() || Dkc1DixieSavedEnabled());
   Dkc1MacUpdateGraphicsMenuState(s_graphics.display,s_graphics.upscaler,s_graphics.screen);
 }
 
@@ -824,24 +835,6 @@ static char *ConfiguredMusicPackPath(void) {
     return copy;
   }
   return Dkc1MacSavedMsu1();
-}
-
-static void ChooseBabyKongRom(void) {
-  char *path = Dkc1MacChooseBabyKongRom();
-  if (!path)
-    return;
-  char error[192];
-  if (Dkc1BabyKongLoadRom(path, error, sizeof error)) {
-    Dkc1BabyKongSetEnabled(true);
-    Dkc1MacSetBabyKongRom(path);
-    Dkc1MacSetBabyKongEnabled(1);
-    snprintf(s_status, sizeof s_status, "Baby Kong enabled | %zu frames",
-             Dkc1BabyKongFrameCount());
-  } else {
-    ShowError("Unsupported DKC3 ROM", error);
-    snprintf(s_status, sizeof s_status, "Baby Kong: %.160s", error);
-  }
-  free(path);
 }
 
 static uint16_t ReadWram16(size_t address) {
@@ -1911,17 +1904,33 @@ void Dkc1MacMenuCommand(int command) {
       ExportRepro();
       return;
     case kDkc1MacMenuToggleBabyKong:
-      if (!Dkc1BabyKongReady()) {
-        ChooseBabyKongRom();
-      } else {
-        Dkc1BabyKongSetEnabled(!Dkc1BabyKongEnabled());
-        Dkc1MacSetBabyKongEnabled(Dkc1BabyKongEnabled());
-        snprintf(s_status, sizeof s_status, "%s",
-                 Dkc1BabyKongStatus());
-      }
+      /* Removed: Baby Kong (Kiddy) is no longer offered; the menu item is
+       * gone, so this is unreachable. */
       break;
     case kDkc1MacMenuChooseBabyKongRom:
-      ChooseBabyKongRom();
+      break;
+    case kDkc1MacMenuToggleDixie:
+      /* The Dixie mod is a full recompilation variant: toggling persists the
+       * choice and relaunches the sibling executable (see dkc1_dixie_mod.h).
+       * In the variant build this item switches back to stock. No ROM picker
+       * is needed: the variant synthesizes the modded image from the same
+       * clean-ROM argument. */
+      if (Dkc1DixieIsVariant()) {
+        Dkc1DixieSwitchAndRelaunch(0, "dkc1_dixie_desktop.exe",
+                                   "DKC1Recomp.exe", s_status,
+                                   sizeof s_status);
+      } else if (!Dkc1DixieSavedEnabled()) {
+        Dkc1DixieSwitchAndRelaunch(1, "dkc1_dixie_desktop.exe",
+                                   "DKC1Recomp.exe", s_status,
+                                   sizeof s_status);
+      } else {
+        Dkc1DixieSetEnabled(0);
+        snprintf(s_status, sizeof s_status,
+                 "Dixie Kong Country will stay off from now on");
+      }
+      break;
+    case kDkc1MacMenuChooseDixieRom:
+      /* Removed: the mod ROM is synthesized; there is nothing to pick. */
       break;
     case kDkc1MacMenuChooseMusicPack: {
       char *path = Dkc1MacChooseMsu1();
@@ -2081,6 +2090,24 @@ static void Cleanup(uint8_t *rom) {
 
 int main(int argc, char **argv) {
   SDL_SetMainReady();
+  /* Optional Dixie Kong Country mod: when the persisted setting is on, this
+   * stock build hands the session to the sibling variant executable before
+   * SDL starts. */
+  {
+    char note[256];
+    if (Dkc1DixieHandoffCheck(argc, argv, "dkc1_dixie_desktop.exe", note,
+                              sizeof note)) {
+      return 0; /* the variant executable owns the session */
+    }
+    if (note[0]) fprintf(stderr, "dixie mod: %s\n", note);
+
+#ifdef DKC1_DIXIE_VARIANT
+  /* The mod's sprite-DMA queue emits zero-size entries that the
+   * hack's target emulator dropped; guard VRAM from the stomps.
+   * (See dma_set_zero_size_vram_noop in snes/dma.h.) */
+  dma_set_zero_size_vram_noop(1);
+#endif
+  }
 #ifndef _WIN32
   (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
 #else
@@ -2113,10 +2140,27 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  Dkc1DixieSetRomPath(rom_path);
+  {
+    char note[256];
+    /* A no-argument launch only has a ROM after the picker/cache resolves it. */
+    if (Dkc1DixieHandoffCheck(0, NULL, "dkc1_dixie_desktop.exe", note,
+                            sizeof note)) {
+      SDL_Quit();
+      return 0;
+    }
+    if (note[0]) fprintf(stderr, "dixie mod: %s\n", note);
+  }
+
   size_t rom_size = 0;
   char rom_error[192];
+#ifdef DKC1_DIXIE_VARIANT
+  uint8_t *rom = Dkc1DixieLoadRom(rom_path, &rom_size, rom_error,
+                                  sizeof rom_error);
+#else
   uint8_t *rom =
       Dkc1ReadVerifiedRom(rom_path, &rom_size, rom_error, sizeof rom_error);
+#endif
   if (!rom) {
     char message[PATH_MAX + 256];
     snprintf(message, sizeof message, "%s\n\n%s", rom_error, rom_path);
@@ -2176,21 +2220,9 @@ int main(int argc, char **argv) {
     return 4;
   }
 
-  if (!getenv("DKC1_BABY_KONG_ROM")) {
-    char *baby_rom = Dkc1MacSavedBabyKongRom();
-    if (baby_rom) {
-      char baby_error[192];
-      if (!Dkc1BabyKongLoadRom(baby_rom, baby_error, sizeof baby_error))
-        fprintf(stderr, "warning: Baby Kong disabled: %s\n", baby_error);
-      free(baby_rom);
-    }
-  }
-  if (Dkc1BabyKongReady()) {
-    const char *baby_enabled = getenv("DKC1_BABY_KONG");
-    Dkc1BabyKongSetEnabled(
-        baby_enabled ? EnvironmentEnabled("DKC1_BABY_KONG")
-                     : Dkc1MacSavedBabyKongEnabled() != 0);
-  }
+  /* Baby Kong was removed from the Mods menu (Dixie Kong Country is the only
+   * character option now); its persisted state is intentionally ignored so
+   * old settings cannot silently reactivate it. */
 
   const char *snapshot = getenv("DKC1_SAVESTATE_INPUT");
   if (snapshot && *snapshot && !RtlLoadSnapshot(snapshot)) {

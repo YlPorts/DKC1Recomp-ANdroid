@@ -228,10 +228,9 @@ int Dkc1MacPauseMenuIsOpen(void) { return s_open; }
   [self button:@"Load Selected Slot" tag:kDkc1MacMenuQuickLoad view:view y:&y];
   [self text:@"Slot 1 uses your existing quicksave. Loading clears rewind history; save files remain separate from cartridge saves." view:view y:&y height:48];[self finish:view y:y];
   view=[self page:@"Mods"];y=16;
-  [self heading:@"Baby Kong" view:view y:&y];
-  [self button:@"Enable / Disable Baby Kong" tag:kDkc1MacMenuToggleBabyKong view:view y:&y];
-  [self button:@"Choose DKC3 Sprite Source…" tag:kDkc1MacMenuChooseBabyKongRom view:view y:&y];
-  [self text:@"The Baby Kong character replacement uses your local DKC3 ROM. Existing character settings are shared with the Mods menu." view:view y:&y height:60];[self finish:view y:y];
+  [self heading:@"Dixie Kong Country" view:view y:&y];
+  [self button:@"Enable / Disable Dixie Kong Country" tag:kDkc1MacMenuToggleDixie view:view y:&y];
+  [self text:@"The Dixie Kong Country mod is built in and needs no extra ROM; enabling it restarts into the mod." view:view y:&y height:60];[self finish:view y:y];
   view=[self page:@"Credits"];y=16;
   [self heading:@"Donkey Kong Country — Native Recompilation" view:view y:&y];
   [self text:@"Original game by Rare and Nintendo. Native recompilation uses snesrecomp. Graphics and CRT models are adapted from DKC2Recomp; color profiles use the shared engine’s screen-color models.\n\nThis app uses your own game data. Third-party source notices are retained with the project." view:view y:&y height:150];[self finish:view y:y];

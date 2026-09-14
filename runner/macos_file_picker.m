@@ -258,11 +258,7 @@ void Dkc1MacInstallMenu(void) {
     AddSubmenu(bar, @"Game", game);
 
     NSMenu *mods = [[NSMenu alloc] initWithTitle:@"Mods"];
-    AddCommand(mods, @"Baby Kong", kDkc1MacMenuToggleBabyKong, @"b",
-               NSEventModifierFlagCommand | NSEventModifierFlagShift);
-    [mods addItem:[NSMenuItem separatorItem]];
-    AddCommand(mods, @"Choose DKC3 ROM…",
-               kDkc1MacMenuChooseBabyKongRom, @"", 0);
+  AddCommand(mods, @"Dixie Kong Country", kDkc1MacMenuToggleDixie, @"d", 0);
     AddSubmenu(bar, @"Mods", mods);
 
     NSMenu *music = [[NSMenu alloc] initWithTitle:@"Music"];
@@ -335,7 +331,7 @@ void Dkc1MacUpdateMenuState(int paused, int fullscreen,
                             Dkc1VideoAspect aspect, Dkc1EdgePolicy edge,
                             unsigned char layer_mask, int provenance,
                             int replacement_music, int baby_kong_enabled,
-                            int baby_kong_ready) {
+                            int baby_kong_ready, int dixie_enabled) {
   if (!s_menu_controller)
     return;
   s_menu_items[kDkc1MacMenuPause].title = paused ? @"Resume" : @"Pause";
@@ -397,10 +393,10 @@ void Dkc1MacUpdateMenuState(int paused, int fullscreen,
       stringForKey:@"DKC1Msu1Directory"];
   s_menu_items[kDkc1MacMenuDisableMusicPack].enabled =
       replacement_music != 0 || configuredMusic.length != 0;
-  s_menu_items[kDkc1MacMenuToggleBabyKong].state =
-      baby_kong_enabled ? NSControlStateValueOn : NSControlStateValueOff;
-  s_menu_items[kDkc1MacMenuToggleBabyKong].title =
-      baby_kong_ready ? @"Baby Kong" : @"Baby Kong (choose DKC3 ROM…)";
+  (void)baby_kong_enabled;
+  (void)baby_kong_ready;
+  s_menu_items[kDkc1MacMenuToggleDixie].state =
+      dixie_enabled ? NSControlStateValueOn : NSControlStateValueOff;
 }
 
 int Dkc1MacDisplayLinkStart(void *native_window, double preferred_fps) {
@@ -525,30 +521,6 @@ char *Dkc1MacChooseRom(void) {
     if (copy)
       memcpy(copy, path, size);
     return copy;
-  }
-}
-
-char *Dkc1MacChooseBabyKongRom(void) {
-  @autoreleasepool {
-    [NSApplication sharedApplication];
-    [NSApp activateIgnoringOtherApps:YES];
-
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.title = @"Choose your Donkey Kong Country 3 ROM";
-    panel.message =
-        @"Baby Kong requires the headerless North American (En,Fr) .sfc ROM. "
-         "The ROM is read in memory and is never copied into DKC1Recomp.";
-    panel.prompt = @"Use for Baby Kong";
-    panel.canChooseDirectories = NO;
-    panel.canChooseFiles = YES;
-    panel.allowsMultipleSelection = NO;
-    panel.allowedContentTypes = @[
-      [UTType typeWithFilenameExtension:@"sfc"],
-      [UTType typeWithFilenameExtension:@"smc"]
-    ];
-    if ([panel runModal] != NSModalResponseOK)
-      return NULL;
-    return CopyFileSystemPath(panel.URL.path);
   }
 }
 

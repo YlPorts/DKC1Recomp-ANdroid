@@ -10,6 +10,8 @@
  */
 #include "dkc1_blank_scan.h"
 #include "dkc1_game.h"
+#include "dkc1_dixie_mod.h"
+#include "snes/dma.h"
 #include "dkc1_invariant_monitor.h"
 #include "dkc1_debug_dump.h"
 #include "dkc1_flight_recorder.h"
@@ -70,6 +72,7 @@ enum {
   kMenuLayerBg2,
   kMenuLayerBg3,
   kMenuLayerObj,
+  kMenuToggleDixie,
 };
 
 static const DWORD kWindowedStyle =
@@ -565,10 +568,14 @@ static HMENU BuildMenuBar(void) {
   AppendMenuA(view, MF_STRING, kMenuFpsCounter, "FPS &Counter");
   AppendMenuA(view, MF_POPUP, (UINT_PTR)aspect, "&Aspect Ratio");
   AppendMenuA(view, MF_POPUP, (UINT_PTR)layers, "&Layers");
+  HMENU mods = CreatePopupMenu();
+  AppendMenuA(mods, MF_STRING, kMenuToggleDixie,
+              "&Dixie Kong Country");
   HMENU bar = CreateMenu();
   AppendMenuA(bar, MF_POPUP, (UINT_PTR)file, "&File");
   AppendMenuA(bar, MF_POPUP, (UINT_PTR)emulation, "&Emulation");
   AppendMenuA(bar, MF_POPUP, (UINT_PTR)view, "&View");
+  AppendMenuA(bar, MF_POPUP, (UINT_PTR)mods, "&Mods");
   return bar;
 }
 
@@ -590,6 +597,11 @@ static void RefreshMenuChecks(void) {
                      Dkc1VideoIsWidescreen() ? kMenuAspectWidescreen
                                              : kMenuAspectNative,
                      MF_BYCOMMAND);
+  CheckMenuItem(
+      s_menu, kMenuToggleDixie,
+      MF_BYCOMMAND | (Dkc1DixieIsVariant() || Dkc1DixieSavedEnabled()
+                          ? MF_CHECKED
+                          : MF_UNCHECKED));
   UINT layer_item;
   switch (Dkc1DebugLayerMask()) {
     case 0x01: layer_item = kMenuLayerBg1; break;
@@ -1174,6 +1186,25 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
           s_running = 0;
           PostQuitMessage(0);
           break;
+        case kMenuToggleDixie:
+          if (Dkc1DixieIsVariant()) {
+            /* The variant's menu item switches back to stock. */
+            Dkc1DixieSwitchAndRelaunch(0, "dkc1_dixie_desktop.exe",
+                                       "dkc1_desktop.exe", s_host_status,
+                                       sizeof s_host_status);
+          } else if (!Dkc1DixieSavedEnabled()) {
+            /* No ROM picker needed: the variant synthesizes the mod from
+             * the same clean-ROM argument. */
+            Dkc1DixieSwitchAndRelaunch(1, "dkc1_dixie_desktop.exe",
+                                       "dkc1_desktop.exe", s_host_status,
+                                       sizeof s_host_status);
+          } else {
+            Dkc1DixieSetEnabled(0);
+            snprintf(s_host_status, sizeof s_host_status,
+                     "Dixie Kong Country will stay off from now on");
+          }
+          RefreshMenuChecks();
+          break;
         case kMenuPauseResume:
           s_paused = !s_paused;
           s_step_once = 0;
@@ -1732,6 +1763,25 @@ static void HostFramePacerClose(HostFramePacer *pacer) {
 
 int main(int argc, char **argv) {
   InitBuildIdentity();
+  Dkc1DixieSetRomPath(argc > 1 ? argv[1] : "dkc1.sfc");
+  /* Optional Dixie Kong Country mod: when the persisted setting is on, this
+   * stock build hands the session to the sibling variant executable before
+   * touching the ROM. */
+  {
+    char note[256];
+    if (Dkc1DixieHandoffCheck(argc, argv, "dkc1_dixie_desktop.exe", note,
+                              sizeof note)) {
+      return 0; /* the variant executable owns the session */
+    }
+    if (note[0]) fprintf(stderr, "dixie mod: %s\n", note);
+
+#ifdef DKC1_DIXIE_VARIANT
+  /* The mod's sprite-DMA queue emits zero-size entries that the
+   * hack's target emulator dropped; guard VRAM from the stomps.
+   * (See dma_set_zero_size_vram_noop in snes/dma.h.) */
+  dma_set_zero_size_vram_noop(1);
+#endif
+  }
   /* Contain default-named tier2 discovery captures instead of littering
    * the working directory; explicit env settings are respected. */
   if (!getenv("SNESRECOMP_TIER2_DIR") && !getenv("SNESRECOMP_TIER2_MANIFEST")) {
@@ -1744,8 +1794,15 @@ int main(int argc, char **argv) {
   snprintf(s_rom_path, sizeof s_rom_path, "%s", rom_path);
   size_t rom_size = 0;
   char rom_error[160];
+#ifdef DKC1_DIXIE_VARIANT
+  /* The variant synthesizes the modded ROM image from the clean ROM
+   * argument (no patched-ROM file needed). */
+  uint8_t *rom = Dkc1DixieLoadRom(rom_path, &rom_size, rom_error,
+                                  sizeof rom_error);
+#else
   uint8_t *rom =
       Dkc1ReadVerifiedRom(rom_path, &rom_size, rom_error, sizeof rom_error);
+#endif
   if (!rom) {
     char message[320];
     snprintf(message, sizeof message,

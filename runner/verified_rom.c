@@ -114,8 +114,12 @@ uint8_t *Dkc1ReadVerifiedRom(const char *path, size_t *size_out,
   const int is_supported = memcmp(hash, kSupportedSha256, sizeof hash) == 0;
   const int is_explicit_development_rom =
       payload_size == 0x400000u && MatchesExplicitDevelopmentHash(hash);
-  if (payload_size != 0x400000u ||
-      (!is_supported && !is_explicit_development_rom)) {
+  /* Patched cartridges belong to the separate variant loader. Accepting one
+   * here would run it against stock generated code and dispatch contracts. */
+  const int rom_accepted =
+      payload_size == 0x400000u &&
+      (is_supported || is_explicit_development_rom);
+  if (!rom_accepted) {
     SetUnsupportedError(error, error_size, payload_size, hash);
     free(file);
     return NULL;

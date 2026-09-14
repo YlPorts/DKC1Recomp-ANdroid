@@ -1,18 +1,17 @@
 @echo off
-rem Build the DKC1 headless host with MSVC directly (no CMake required).
+rem Dixie variant TOOLS build (function-entry profile/watch enabled).
+rem Same trust boundary as build_host_dixie.bat; see docs/DIXIE_MOD.md.
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -no_logo
 cd /d %~dp0
-rem Build identity: git commit (+dirty), timestamp, config -> window title,
-rem debug panel, and save-state sidecars (stale-executable detection).
 set DKC1_GIT=nogit
 for /f %%i in ('git rev-parse --short HEAD 2^>nul') do set DKC1_GIT=%%i
 git diff-index --quiet HEAD -- 2>nul || set DKC1_GIT=%DKC1_GIT%-dirty
-set BUILD_ID_DEFS=/DDKC1_BUILD_COMMIT=\"%DKC1_GIT%\" "/DDKC1_BUILD_TIME=\"%DATE% %TIME:~0,5%\"" /DDKC1_BUILD_CONFIG=\"primary\"
+set BUILD_ID_DEFS=/DDKC1_BUILD_COMMIT=\"%DKC1_GIT%\" "/DDKC1_BUILD_TIME=\"%DATE% %TIME:~0,5%\"" /DDKC1_BUILD_CONFIG=\"dixie-tools\"
 set SR=..\..\snesrecomp\runner\src
-if not exist build\hostobj mkdir build\hostobj
-cd build\hostobj
-set DEFS=/DSNESRECOMP_TRACE=0 /DSNESRECOMP_REVERSE_DEBUG=0 /DSNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1 /DSYSTEM_VOLUME_MIXER_AVAILABLE=0 /D_CRT_SECURE_NO_WARNINGS
-set INCS=/I%SR% /I%SR%\snes /I..\..\recomp /I..\..\runner
+if not exist build\hostobj_dixie_tools mkdir build\hostobj_dixie_tools
+cd build\hostobj_dixie_tools
+set DEFS=/DDKC1_DIXIE_VARIANT=1 /DSNESRECOMP_TRACE=0 /DSNESRECOMP_FUNC_ENTRY_HOOK=1 /DSNESRECOMP_REVERSE_DEBUG=0 /DSNESRECOMP_EXTERNAL_RAM_ROUTINE_GUARDS=1 /DSYSTEM_VOLUME_MIXER_AVAILABLE=0 /D_CRT_SECURE_NO_WARNINGS
+set INCS=/I%SR% /I%SR%\snes /I..\..\recomp\dixie /I..\..\recomp /I..\..\runner
 
 cl /nologo /c /MP8 /W0 /O1 %DEFS% %INCS% ^
   %SR%\common_cpu_infra.c %SR%\common_rtl.c %SR%\widescreen.c ^
@@ -40,31 +39,11 @@ cl /nologo /c /MP8 /W0 /O1 %DEFS% %INCS% ^
   ..\..\runner\dkc1_blank_scan.c ^
   ..\..\runner\dkc1_invariant_monitor.c ^
   ..\..\runner\verified_rom.c ^
-  ..\..\generated\snesrecomp\*.c
+  ..\..\generated\snesrecomp_dixie\*.c
 if errorlevel 1 exit /b 1
-cl /nologo /c /W0 /O1 %DEFS% %INCS% %BUILD_ID_DEFS% /Fo:..\main_headless.obj ..\..\runner\headless_main.c
+cl /nologo /c /W0 /O1 %DEFS% %INCS% %BUILD_ID_DEFS% /Fo:..\main_headless_dixie_tools.obj ..\..\runner\headless_main.c
 if errorlevel 1 exit /b 1
-cl /nologo /c /W0 /O1 %DEFS% %INCS% %BUILD_ID_DEFS% /Fo:..\main_win32.obj ..\..\runner\win32_host.c
-if errorlevel 1 exit /b 1
-set LINK_RETRIES=0
 dir /b *.obj > objects.rsp
-:link_headless
-link /nologo /out:..\dkc1_snesrecomp_headless.exe @objects.rsp ..\main_headless.obj ws2_32.lib user32.lib advapi32.lib
-if not errorlevel 1 goto link_desktop_begin
-set /a LINK_RETRIES+=1
-if %LINK_RETRIES% GEQ 5 exit /b 1
-timeout /t 2 /nobreak >nul
-goto link_headless
-
-:link_desktop_begin
-set LINK_RETRIES=0
-:link_desktop
-link /nologo /out:..\dkc1_desktop.exe @objects.rsp ..\main_win32.obj ws2_32.lib user32.lib advapi32.lib gdi32.lib winmm.lib comdlg32.lib
-if not errorlevel 1 goto build_ok
-set /a LINK_RETRIES+=1
-if %LINK_RETRIES% GEQ 5 exit /b 1
-timeout /t 2 /nobreak >nul
-goto link_desktop
-
-:build_ok
-echo HOST_BUILD_OK
+link /nologo /out:..\dkc1_dixie_headless_tools.exe @objects.rsp ..\main_headless_dixie_tools.obj ws2_32.lib user32.lib advapi32.lib
+if errorlevel 1 exit /b 1
+echo DIXIE_TOOLS_BUILD_OK

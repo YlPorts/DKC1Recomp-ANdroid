@@ -2,6 +2,36 @@
   "schema": "dkc1.known-issues.v1",
   "issues": [
     {
+      "id": "dixie-map-sprite-corruption",
+      "status": "fixed",
+      "summary": "The optional Dixie variant shows conspicuous garbage sprite clusters on Kongo Jungle and Jungle entrance maps, including after death. Fresh controller-only boot reproduces it; Jungle gameplay is clean in the inspected movement branches.",
+      "repro": "Dixie headless, native mode, first 5750 frames of recipes/dixie-jungle-startup.dks from the verified clean ROM; tracked Jungle-map OAM cluster begins at frame 5728, with earlier corruption on the preceding map.",
+      "expected": "Clean map sprites and transitions without filtering visible OAM or rewriting historical save-state contents.",
+      "first_seen": "2026-09-13",
+      "evidence": "docs/DIXIE_MAP_FIX_2026-09-14.md; build/dixie-map-fix-20260914/final-manifest.json; map-regression.json; final-validation.json; final-visible-after.jpg; historical docs/DIXIE_QA_2026-09-13.md",
+      "fixed_note": "The pinned mod's pose table at BB:F8A8 points to 41:6000, file offset 416000. Stock folding read unrelated bytes at 016000 as sprite layout data. Enable bounded linear low data banks only in the Dixie variant, retaining C0-FF stock aliases and default-off stock mapping. Fresh boot and normal map refresh are clean; three controller-only refreshes produce identical snapshots with six lives, 83 bananas and progress preserved. Ropey entry, Jungle spin, stock output, save continuity and visible SDL QA pass. Old serialized graphics remain historical until normal reload; the original tester save is backed up. Full-game and widescreen validation remain incomplete."
+    },
+    {
+      "id": "sdl-startup-route-oam-port-timing",
+      "status": "fixed",
+      "summary": "Input-only SDL startup routes skipped the per-frame drawing/HDMA/VBlank step, leaving PPU OAM uploads misaligned and visibly corrupting both stock and Dixie sprites at first interactive presentation.",
+      "repro": "DKC1_STARTUP_SCRIPT=recipes/dixie-jungle-startup.dks, native mode, clean boot; Dixie first interactive frame 7602.",
+      "expected": "The startup route must execute the same CPU and rendering/VBlank sequence as the normal runner, preserving its native framebuffer and all guest-memory hashes.",
+      "first_seen": "2026-09-13",
+      "evidence": "docs/DIXIE_QA_2026-09-13.md; build/dixie-qa-20260913/startup-comparison.json; final-checks.log",
+      "fixed_note": "Initialize the offscreen drawing buffer and run Dkc1DrawPpuFrame once per successful startup frame. Three fresh Dixie SDL runs match the headless framebuffer and WRAM/VRAM/CGRAM/PPU OAM/OAM-shadow hashes; stock SDL also matches its independent headless oracle. The existing no-startup-script path is unchanged. Old corrupt startup snapshots remain historical evidence."
+    },
+    {
+      "id": "dixie-windows-relaunch-integration",
+      "status": "fixed",
+      "summary": "Dixie menu restarts lost the selected ROM path and the SDL variant could return to the debugger filename; the regular Windows build lacked a matching SDL variant target.",
+      "repro": "Toggle Mods > Dixie Kong Country in both Windows hosts with a clean ROM path containing spaces; also start SDL with a persisted choice and cached ROM.",
+      "expected": "Preserve the resolved ROM and restart into the correct sibling frontend; stock must reject the 6 MiB image against stock generated code.",
+      "first_seen": "2026-09-13",
+      "evidence": "docs/DIXIE_QA_2026-09-13.md; build/dixie-qa-20260913/",
+      "fixed_note": "Preserve the selected ROM, quote paths, specify the CreateProcess target, resolve picker/cache paths before handoff, honor explicit menu changes over inherited automation settings, and restore the prior preference on a failed menu launch. Added opt-in SDL CMake variant target, repaired Windows platform self-tests, and restored the stock ROM identity gate. Actual stock/Dixie/stock menu restarts, native GPU smoke and all three Windows CTests pass."
+    },
+    {
       "id": "no-contact-damage",
       "status": "fixed",
       "summary": "Contact damage never lands: DK overlaps the first Gnawty for 3800+ frames unharmed in BOTH native and wide modes, and identically under forced LLE (not a dispatch/widescreen defect).",
