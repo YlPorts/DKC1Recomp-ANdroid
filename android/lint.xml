@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Upstream SDL2 optional APIs: this host NEVER requests microphone capture
+         or haptic output. Its BLE path exits on missing Bluetooth permission;
+         ordinary system gamepad events do not need these permissions.
+         Do not add unused dangerous permissions just to silence library checks. -->
+    <issue id="MissingPermission">
+        <ignore path="third_party/SDL2/android-project/app/src/main/java/org/libsdl/app/HIDDeviceBLESteamController.java" />
+        <ignore path="third_party/SDL2/android-project/app/src/main/java/org/libsdl/app/HIDDeviceManager.java" />
+        <ignore path="third_party/SDL2/android-project/app/src/main/java/org/libsdl/app/SDLAudioManager.java" />
+        <ignore path="third_party/SDL2/android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java" />
+    </issue>
+    <!-- SDL's API26 subclasses are instantiated behind actual SDK>=26 gates
+         in SDLActivity.getMotionListener / SDLControllerManager.initialize. -->
+    <issue id="NewApi">
+        <ignore path="third_party/SDL2/android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java" />
+    </issue>
+    <!-- Runtime fix is in GameActivity.registerReceiver. The HID manager's
+         mContext is that Activity, so its two-argument call is intercepted. -->
+    <issue id="UnspecifiedRegisterReceiverFlag">
+        <ignore path="third_party/SDL2/android-project/app/src/main/java/org/libsdl/app/HIDDeviceManager.java" />
+    </issue>
+</lint>

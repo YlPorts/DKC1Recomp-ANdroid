@@ -1,0 +1,25 @@
+name: Character reference source
+on:
+  push:
+    branches: ['android/initial-port']
+    paths: ['.github/workflows/character-reference.yml']
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: sonicretro/s2disasm
+          ref: 380f37a731bfc720bb0371a35a593184a7ec5e43
+          persist-credentials: false
+      - name: Archive public reference
+        run: git archive --format=tar.gz HEAD > "$RUNNER_TEMP/sonic2-reference.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sonic2-reference
+          path: ${{ runner.temp }}/sonic2-reference.tar.gz
+          retention-days: 1
+          compression-level: 0

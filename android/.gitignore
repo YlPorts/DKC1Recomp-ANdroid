@@ -1,0 +1,20 @@
+.gradle/
+.cxx/
+**/build/
+third_party/
+.tool-cache/
+local.properties
+*.jks
+*.keystore
+*.apk
+*.aab
+__pycache__/
+# Private game inputs, derived data and saves must never be published.
+*.sfc
+*.smc
+*.srm
+*.sav
+*.state
+*.pcm
+*.log
+*.pyc
