@@ -13,6 +13,12 @@ immutable exact-state/fresh-entry evidence are in
 `DKC1_SAVESTATE_INPUT`; it verifies normal map reload, resources and navigation
 with three identical native replays. It does not promote widescreen coverage.
 
+Windows v0.0.12 adds `verify_ingame_saves.py` for three-repeat SRAM persistence
+and cold-restart checks. Its isolated user-directory contract, audio comparison
+exclusions and controlled Candy fixture are documented in
+[`INGAME_SAVES.md`](INGAME_SAVES.md) and the canonical tool catalog. Desktop
+debugging now requires private save directories to avoid updating user SRAM.
+
 Windows v0.0.10 exposes the shared SDL host diagnostics and three ROM-free
 CTest targets. See the Windows section of the canonical tool catalog and
 [`WINDOWS_RELEASE.md`](WINDOWS_RELEASE.md). This does not promote a new

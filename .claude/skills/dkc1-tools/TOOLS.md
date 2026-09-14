@@ -273,6 +273,13 @@ optional `quickload` leg seeded by a state the entry route itself saves.
 - `ingest_dkc1_disasm.py` — disassembly ingestion used for seeding.
 
 **Regression / sweeps**
+
+- `verify_ingame_saves.py --rom R --exe DESKTOP --headless HEADLESS
+  --entry-state S --input INPUT --frames N --restart-script ROUTE --out NEW_DIR`
+  — isolated three-repeat cartridge-save/disk/cold-restart validation. Native
+  snapshot v9 only; compares guest state with explicit source-verified host
+  audio-queue exclusions and preserves raw hashes. The restart leg never loads
+  a state. See `docs/INGAME_SAVES.md` for the Candy fixture and exact scope.
 - `analyze_pacing.py LOG [--warmup N] [--json]` — summarize desktop
   scheduler submit cadence separately from emulation/render work and GDI
   completion; v1 and v2 pacing logs are accepted.

@@ -20,6 +20,7 @@
 #include "input_playback.h"
 #include "verified_rom.h"
 #include "wram_dump.h"
+#include "desktop_sram.h"
 
 #include "common_cpu_infra.h"
 #include "common_rtl.h"
@@ -40,6 +41,9 @@
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
+
+static Dkc1SramStore s_sram_store;
+static int s_sram_error_reported;
 
 enum {
   kScale = 2,
@@ -1831,6 +1835,15 @@ int main(int argc, char **argv) {
                 MB_ICONERROR);
     return 4;
   }
+  {
+    char error[256];
+    if (!Dkc1SramLoad(&s_sram_store, g_sram, (size_t)g_sram_size,
+                      error, sizeof error)) {
+      MessageBoxA(NULL, error, "Unable to load in-game saves", MB_ICONERROR);
+      free(rom);
+      return 13;
+    }
+  }
 
   {
     const char *panel_text = getenv("DKC1_DESKTOP_DEBUG_PANEL");
@@ -2248,6 +2261,15 @@ int main(int argc, char **argv) {
       MessageBoxA(s_window, message, "DKC1Recomp", MB_ICONERROR);
       break;
     }
+    {
+      char error[256];
+      if (!Dkc1SramFlush(&s_sram_store, g_sram, (size_t)g_sram_size,
+                         false, error, sizeof error) && !s_sram_error_reported) {
+        s_sram_error_reported = 1;
+        s_paused = 1;
+        MessageBoxA(s_window, error, "Unable to write in-game saves", MB_ICONERROR);
+      }
+    }
     Dkc1DrawPpuFrame();
     pacer.pending_render_ms = HostFramePacerPhaseMs(&pacer, &phase_tick);
     s_host_frame++;
@@ -2331,6 +2353,12 @@ int main(int argc, char **argv) {
   Dkc1ScriptFree();
   Dkc1InputPlaybackFree(&s_input_playback);
   HostFramePacerClose(&pacer);
+  char save_error[256];
+  bool saved = g_fail || !Dkc1LastLleResult() ||
+      Dkc1SramFlush(&s_sram_store, g_sram, (size_t)g_sram_size,
+                    true, save_error, sizeof save_error);
+  if (!saved)
+    MessageBoxA(NULL, save_error, "Unable to write in-game saves", MB_ICONERROR);
   free(rom);
-  return 0;
+  return saved ? 0 : 13;
 }

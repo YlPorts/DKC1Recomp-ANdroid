@@ -110,3 +110,8 @@ its detector count in the contract `budgets`; tighten to 0 when fixed.
 
 Full catalog of all 47 tools, every env var, route DSL, and debug keys:
 **`TOOLS.md` in this folder.**
+
+For battery/in-game saves, use `verify_ingame_saves.py` and
+`docs/INGAME_SAVES.md`. Desktop hosts now persist SRAM: isolate their user
+directory (SDL: `DKC1_USER_DIR`; legacy Win32: working directory). Headless
+tests retain explicit SRAM input and never implicitly update a battery file.
