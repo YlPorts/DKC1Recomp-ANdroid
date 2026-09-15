@@ -115,3 +115,13 @@ For battery/in-game saves, use `verify_ingame_saves.py` and
 `docs/INGAME_SAVES.md`. Desktop hosts now persist SRAM: isolate their user
 directory (SDL: `DKC1_USER_DIR`; legacy Win32: working directory). Headless
 tests retain explicit SRAM input and never implicitly update a battery file.
+
+For the native iPhone/iPad frontend, read `docs/IOS.md`. `build_ios.sh` builds
+the app; `tools/verify_ios_simulator.py` compares three runs of the existing
+headless runner inside the simulator app against three desktop runs.
+`DKC1_IOS_DIAGNOSTICS` is a default-off build option. Mobile landscape chooses
+a bounded native source width (418 on the connected phone) with fixed SNES
+pixel proportions. Read `docs/IOS.md` for the limited validated scene scope.
+The same default-off diagnostic build supports `--verify-graphics`, reusing
+the native Metal output/cache oracle, plus paused upscale-preview captures.
+See `TOOLS.md` for source-frame inputs, output hashes and UI probe limits.

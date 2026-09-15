@@ -72,6 +72,20 @@ class GradeFreshEntryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing fields"):
             GRADER.grade_repeat(self.write_trace([row()]), strict=True)
 
+    def test_mobile_black_margin_uses_requested_source_extent(self):
+        from test_analyze_ws_trace import centered_record
+        rows = []
+        for frame in range(1, 4):
+            value = centered_record(frame, extra=81)
+            value["scene"] = {"mode": 0x000C, "level": 1}
+            value["camera"].update({"lower": 0x0100, "upper": 0x0100})
+            rows.append(value)
+        trace = self.write_trace(rows)
+        correct = GRADER.grade_repeat(trace, strict=True, extra=81)
+        self.assertEqual("pass", correct["status"])
+        wrong = GRADER.grade_repeat(trace, strict=True)
+        self.assertIn("centered_nonblack_margin", wrong["failures"])
+
 
 if __name__ == "__main__":
     unittest.main()

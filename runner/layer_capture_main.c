@@ -31,8 +31,8 @@
 #define Dkc1SetEnv(name, value) setenv((name), (value), 0)
 #endif
 
-static uint8_t s_pixels[kDkc1VideoWidescreenWidth * kDkc1VideoHeight * 4];
-static uint8_t s_backdrop[kDkc1VideoWidescreenWidth * kDkc1VideoHeight * 4];
+static uint8_t s_pixels[kDkc1VideoMaxWidth * kDkc1VideoHeight * 4];
+static uint8_t s_backdrop[kDkc1VideoMaxWidth * kDkc1VideoHeight * 4];
 
 static int WritePpm(const char *path, const uint8_t *bgra, int width,
                     int height) {
@@ -96,6 +96,16 @@ int main(int argc, char **argv) {
     const char *aspect = getenv("DKC1_ASPECT");
     if (Dkc1VideoIsWidescreen() && aspect && strcmp(aspect, "16:10") == 0)
       Dkc1VideoSetAspect(kDkc1VideoAspect16x10);
+    const char *render_width = getenv("DKC1_RENDER_WIDTH");
+    if (render_width && *render_width) {
+      char *end = NULL;
+      long width = strtol(render_width, &end, 10);
+      if (*end || width < kDkc1VideoNativeWidth || width > kDkc1VideoMaxWidth ||
+          !Dkc1VideoSetRenderWidth((int)width)) {
+        fprintf(stderr, "DKC1_RENDER_WIDTH must be an even width in 256..448\n");
+        return 2;
+      }
+    }
     {
       /* Level-wall presentation: glide (default), reflect, bars, or shift. */
       const char *edge_text = getenv("DKC1_WIDESCREEN_EDGE");

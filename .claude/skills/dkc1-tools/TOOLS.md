@@ -3,6 +3,57 @@
 Companion to `SKILL.md`. Everything documented here lives in the repo;
 paths are repo-relative. `<rom>` = headerless DKC1 USA v1.0.
 
+## iOS host and cross-platform evidence
+
+`bash build_ios.sh iphonesimulator|iphoneos [ROM]` builds UIKit. Set
+`DKC1_IOS_TEAM` for signing; otherwise the device bundle is unsigned.
+`DKC1_IOS_DIAGNOSTICS=ON` embeds the existing headless runner and Metal graphics
+oracle for simulator QA;
+it is OFF for normal device builds.
+
+`verify_ios_simulator.py --simulator UDID --rom R --headless H --out NEW_DIR`
+compares three independent iOS and desktop replays of
+`recipes/route_jungle.dks` (override with `--route`, `--frames`). It requires
+frame/WRAM/VRAM/CGRAM/PPU-OAM/OAM-shadow/audio equality and writes raw evidence
+plus `comparison.json`. It replaces the selected diagnostic app's imported
+ROM and terminates it between runs; never target an active play session.
+`--verify` invokes the existing headless main after UIKit startup. Diagnostic
+interactive mode also accepts `DKC1_IOS_QA_PAUSED`, `DKC1_IOS_QA_LANDSCAPE`,
+`DKC1_IOS_QA_MENU`, `DKC1_IOS_QA_HOLD_Y` (with `QA_PAUSED` for the hold
+indicator), `DKC1_IOS_QA_ROLL_Y_B` (with `QA_PAUSED` for both pressed
+highlights), `DKC1_SAVESTATE_INPUT`, and the existing input/wait-only
+startup script. These new UI overrides are compiled out of device releases.
+`DKC1_IOS_QA_UPSCALER=0|1|2|3` selects nearest/bilinear/Reconstruct/Sharp
+Bilinear without saving the preference; `DKC1_IOS_QA_UPSCALING_MENU=1` opens
+the live-preview settings sheet. Pair these with the immutable state and
+paused/landscape flags for image comparison. They are display probes, not
+automated touch interaction.
+
+`--verify-graphics` invokes `tests/test_macos_graphics.m` unchanged inside the
+diagnostic app. Optional `Documents/graphics-source.ppm` supplies a P6 frame;
+otherwise it uses the test's synthetic pattern. `DKC1_TEST_SCALE` (1..16,
+default 4) and `DKC1_TEST_PIXEL_ASPECT=1` select output geometry. Outputs go
+to `Documents/graphics-qa/case-00.ppm` through `case-11.ppm`, with completion
+code in `result.txt` and metrics on stdout. Remove/move the previous result
+before another run. Prefix environment variables with `SIMCTL_CHILD_` when
+launching via `simctl`. Compare the PPMs with the normal macOS
+`test_macos_graphics` target. This checks GPU output/cache behavior without
+running or mutating a game session; it does not measure a physical phone GPU.
+Commands, evidence, the iOS 27 scene-crash fix and limits: `docs/IOS.md`.
+For publication, `scripts/package_ios.py --app APP --out NEW_DIR --version X.Y.Z
+--identity ID` checks committed build identity, excludes private provisioning,
+signs with Apple Distribution, verifies the extracted IPA and emits hashes.
+This profile-free sideload artifact requires recipient-side re-signing;
+the provisioned input app remains untouched. See `docs/RELEASE_0.0.14.md`.
+
+`--render-width 418` selects phone-width replay (default 256). Headless and
+layer capture accept `DKC1_RENDER_WIDTH`: even 256..448, overriding the aspect
+preset, unset by default. Their buffers cover the pinned PPU's 448 capacity.
+`fresh_entry_stress_sweep.py --render-width 418` keeps the native twin at 256
+and grades wide margins at 81 columns; its default stays 342/43 columns.
+`grade_repeat(..., extra=81)` supports that trace geometry. Use the matching
+`--extra 81` for the existing transition and region comparison tools.
+
 ## Build scripts (repo root)
 
 | script | purpose |

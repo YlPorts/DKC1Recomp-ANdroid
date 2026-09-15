@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(dkc1_port
-    VERSION 0.0.13
+    VERSION 0.0.14
     DESCRIPTION "Native PC recompilation of Donkey Kong Country"
     LANGUAGES C)
 
@@ -92,6 +92,11 @@ set(DKC1_ENGINE_SOURCES ${SNESRECOMP_RUNNER_SOURCES})
 list(REMOVE_ITEM DKC1_ENGINE_SOURCES
     "${SNESRECOMP_ROOT}/runner/src/keybinds.c"
     "${SNESRECOMP_ROOT}/runner/src/host_report.c")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    include(cmake/ios.cmake)
+    return()
+endif()
 
 add_executable(dkc1_snesrecomp_headless
     ${DKC1_ENGINE_SOURCES}

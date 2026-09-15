@@ -25,6 +25,13 @@ is the unchanged v0.0.9 build and does not include Dixie or the v0.0.12 save fix
 Starting with v0.0.12 on Windows, Candy's in-game saves persist across launches.
 See [save locations, recovery and validation](docs/INGAME_SAVES.md).
 
+A native **iPhone/iPad frontend** is available in **v0.0.14**, with
+full-screen landscape, transparent touch controls, Y/B thumb rolling and Y
+hold, Metal upscaling, stereo audio, controller support, ROM import and saves.
+The signed sideload IPA requires re-signing for the recipient's device.
+The release also retains the Windows v0.0.13 and Mac v0.0.9 downloads.
+See [iOS build instructions and validated scope](docs/IOS.md).
+
 ## Why this game is a strong recomp candidate
 
 

@@ -2,6 +2,46 @@
   "schema": "dkc1.known-issues.v1",
   "issues": [
     {
+      "id": "ios-single-thumb-run-jump-roll",
+      "status": "fixed",
+      "summary": "A thumb that began on Y could not also press B by rolling across the touch diamond; the preceding adapter update handled separate fingers only.",
+      "repro": "Press Y with one thumb, roll toward B without lifting, roll back to Y, then repeat.",
+      "expected": "Y stays held, B presses when the same thumb overlaps it, and rolling back releases B for another jump. Double-tap Y hold still works.",
+      "first_seen": "2026-09-14",
+      "evidence": "docs/IOS.md; tests/test_ios_touch_button.c; build/ios-roll-tests.log; build/ios-validation/roll-y-b.png; build/ios-roll-install.json; build/ios-roll-launch.json",
+      "fixed_note": "UIKit keeps a contact with its initial view. Y now forwards per-contact overlap with B using stable layout coordinates and a bounded contact-radius estimate. B combines rolled contributions with its independent direct touches; rolling away or lifting removes only the matching contribution. A release band prevents boundary jitter and a roll invalidates Y double-tap candidacy. The production model passes repeated single-contact Y/B rolls, direct-plus-rolled touches, edge jitter, radius bounds and cancellation; both native Release builds pass. Simulator display QA checks both highlights. Physical thumb feel remains for user playtesting; no runtime/video or save-format changes."
+    },
+    {
+      "id": "ios-simultaneous-run-jump-touch",
+      "status": "fixed",
+      "summary": "The original UIKit game buttons used transient highlight state for input; the player needs reliable Y+B chords and a double-tap Y hold toggle.",
+      "repro": "Keep Y pressed and press/release B repeatedly. Double-tap Y, lift the finger, jump with B, then double-tap Y again.",
+      "expected": "Each button remains independently pressed for its touch lifetime; Y can latch on/off with a visible HOLD indicator.",
+      "first_seen": "2026-09-14",
+      "evidence": "docs/IOS.md; tests/test_ios_touch_button.c; build/ios-touch-tests.log; build/ios-validation/touch-hold-y.png",
+      "fixed_note": "Track actual UITouch identities and independent button state, explicitly enable concurrent controls, and OR active button masks. Recognize short Y tap pairs without delaying normal button input. Display a green HOLD ring/label and clear input on pause/cancellation. The real input model passes overlapping Y/B presses, repeated jumps, latch on/off, non-latching B taps, long press, drag, multiple fingers and stale release tests. Simulator visible QA and signed device build/install complete; physical touch feel remains for user playtesting. Guest masks, runtime timing and landscape rendering are unchanged."
+    },
+    {
+      "id": "ios-landscape-stretched-native-image",
+      "status": "fixed",
+      "summary": "The first iOS landscape overlay stretched a 256x224 framebuffer to the phone aspect, distorting the game.",
+      "repro": "Load the iOS game and enter landscape; distortion appeared on the first displayed landscape frame.",
+      "expected": "Render additional native source columns, preserve SNES pixel proportions, fill the phone with transparent touch controls.",
+      "first_seen": "2026-09-14",
+      "evidence": "docs/IOS.md; build/ios-validation/native-wide/; build/ios-release/BUILDINFO.json",
+      "fixed_note": "The UIKit host selects an even display-matched source width, 418x224 on iPhone 16 Pro Max, bounded by the existing 448-column PPU capacity. Rebind the framebuffer pitch on geometry changes; present at fixed 7:6 pixel aspect with nearest sampling. Gameplay enters landscape automatically. Native-center exact-state comparisons and six cross-platform replays pass; all 27 samples across four tested transitions pass. Four available clean entrances pass terrain grades and repeat determinism; native-wide machine differences remain investigations and the 40-entrance floor is incomplete. Desktop presets are unchanged. No ROM, generated code, submodule, shared calibration or gameplay-policy edits."
+    },
+    {
+      "id": "ios27-scene-lifecycle-launch",
+      "status": "fixed",
+      "summary": "The initial UIKit device build traps before the first game frame on iOS 27 because it creates an application window without adopting scene lifecycle.",
+      "repro": "Launch the initial signed arm64 build on iPhone 16 Pro Max running iOS 27.0 (24A5408d). The iOS 26.5 simulator does not enforce the requirement.",
+      "expected": "Create the native window through UIWindowScene and boot the verified game normally.",
+      "first_seen": "2026-09-14",
+      "evidence": "docs/IOS.md; build/ios-validation/device-crash.ips; build/ios-device-console-fixed.log; build/ios-install.json; build/ios-validation/jungle-replays/comparison.json",
+      "fixed_note": "The crash names ___UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption_block_invoke. Add a single Game scene declaration, DKCSceneDelegate, and initWithWindowScene. The corrected app boots and remains running on the same phone; the live intro and touch interface were inspected via QuickTime. Three iOS and desktop fresh Jungle replays match all seven frame/memory/audio fingerprints. No game, ROM, saved-state, or widescreen changes. Whole-game mobile performance and physical Bluetooth controllers are not yet validated."
+    },
+    {
       "id": "dixie-stomp-haptics",
       "status": "fixed",
       "summary": "Dixie enemy stomps produce no feedback because the host compares her rebound to stock DK's value; the Windows host also lacks visible rumble controls.",

@@ -1,5 +1,25 @@
 # Widescreen debug tooling plan
 
+## Native iOS portability check
+
+`tools/verify_ios_simulator.py` runs the existing headless implementation inside
+a diagnostic UIKit app and compares three fresh-boot replays with three desktop
+replays. It records frame, WRAM, VRAM, CGRAM, both OAM and audio hashes plus raw
+evidence. `DKC1_IOS_DIAGNOSTICS` is OFF in device releases; the new UI capture
+overrides are compiled out. `--render-width 418` compares native phone-width
+rendering (default 256). Headless/layer capture accept the bounded, optional
+`DKC1_RENDER_WIDTH` override. The fresh-entry stress tool accepts an explicit
+`--render-width`, keeps its native twin at 256, and grades the matching margin.
+See [iOS commands, tested scenes and incomplete full-game floor](IOS.md)
+and the canonical tool catalog for invocation and save-container isolation.
+The paused `DKC1_IOS_QA_ROLL_Y_B` display probe shows the simultaneous Y/B
+touch contribution; it does not automate or certify physical thumb input.
+`--verify-graphics` runs the existing Metal output/cache oracle inside the
+diagnostic iOS app. `DKC1_IOS_QA_UPSCALER` and
+`DKC1_IOS_QA_UPSCALING_MENU` select a filter and its live-preview sheet for
+paused source-identical screenshots. See the canonical catalog for inputs,
+outputs and the distinction between display probes and physical touch QA.
+
 Optional Dixie verification uses the existing native route runner with
 `contracts/dixie-jungle.json` and `build/dkc1_dixie_headless.exe`; do not run
 its patched cartridge through the stock host or assume that a native pass

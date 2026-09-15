@@ -1,14 +1,14 @@
 # DKC1Recomp regression dashboard
 
-Generated 2026-09-14 05:58 UTC at commit `1d722d9-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
+Generated 2026-09-15 00:47 UTC at commit `f4c82a2-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
 
 ## Contracts
 
 | contract | last result | legs | evidence |
 |---|---|---|---|
-| dixie-jungle (`dixie-jungle.json`) | PASS | entry+quickload | `D:\RQ-Engine\DKC1Recomp\build\release-v0.0.13\regression\dixie-jungle` |
-| dixie-map-refresh (`dixie-map-refresh.json`) | PASS | entry | `D:\RQ-Engine\DKC1Recomp\build\release-v0.0.13\map-regression\dixie-map-refresh` |
-| dixie-stomp (`dixie-stomp.json`) | PASS | entry | `D:\RQ-Engine\DKC1Recomp\build\release-v0.0.13\stomp-regression\dixie-stomp` |
+| dixie-jungle (`dixie-jungle.json`) | NOT RUN in latest cycle | - | - |
+| dixie-map-refresh (`dixie-map-refresh.json`) | NOT RUN in latest cycle | - | - |
+| dixie-stomp (`dixie-stomp.json`) | NOT RUN in latest cycle | - | - |
 | jungle-death-transition (`jungle-death-transition.json`) | NOT RUN in latest cycle | - | - |
 | jungle-entry (`jungle-entry.json`) | NOT RUN in latest cycle | - | - |
 
@@ -20,6 +20,10 @@ _No sweep report; run `python tools/level_sweep.py`._
 
 | id | status | summary | repro |
 |---|---|---|---|
+| ios-single-thumb-run-jump-roll | fixed | A thumb that began on Y could not also press B by rolling across the touch diamond; the preceding adapter update handled separate fingers only. | `Press Y with one thumb, roll toward B without lifting, roll back to Y, then repeat.` |
+| ios-simultaneous-run-jump-touch | fixed | The original UIKit game buttons used transient highlight state for input; the player needs reliable Y+B chords and a double-tap Y hold toggle. | `Keep Y pressed and press/release B repeatedly. Double-tap Y, lift the finger, jump with B, then double-tap Y again.` |
+| ios-landscape-stretched-native-image | fixed | The first iOS landscape overlay stretched a 256x224 framebuffer to the phone aspect, distorting the game. | `Load the iOS game and enter landscape; distortion appeared on the first displayed landscape frame.` |
+| ios27-scene-lifecycle-launch | fixed | The initial UIKit device build traps before the first game frame on iOS 27 because it creates an application window without adopting scene lifecycle. | `Launch the initial signed arm64 build on iPhone 16 Pro Max running iOS 27.0 (24A5408d). The iOS 26.5 simulator does not enforce the requirement.` |
 | dixie-stomp-haptics | fixed | Dixie enemy stomps produce no feedback because the host compares her rebound to stock DK's value; the Windows host also lacks visible rumble controls. | `contracts/dixie-stomp.json: fresh boot, falling at frame 7749, stomp at 7750. Equivalent immutable Jungle-state route reaches the stomp at relative frame 149.` |
 | dixie-map-sprite-corruption | fixed | The optional Dixie variant shows conspicuous garbage sprite clusters on Kongo Jungle and Jungle entrance maps, including after death. Fresh controller-only boot reproduces it; Jungle gameplay is clean in the inspected movement branches. | `Dixie headless, native mode, first 5750 frames of recipes/dixie-jungle-startup.dks from the verified clean ROM; tracked Jungle-map OAM cluster begins at frame 5728, with earlier corruption on the preceding map.` |
 | sdl-startup-route-oam-port-timing | fixed | Input-only SDL startup routes skipped the per-frame drawing/HDMA/VBlank step, leaving PPU OAM uploads misaligned and visibly corrupting both stock and Dixie sprites at first interactive presentation. | `DKC1_STARTUP_SCRIPT=recipes/dixie-jungle-startup.dks, native mode, clean boot; Dixie first interactive frame 7602.` |

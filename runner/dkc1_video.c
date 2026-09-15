@@ -225,13 +225,21 @@ void Dkc1VideoSetAspect(Dkc1VideoAspect aspect) {
   else
     aspect = kDkc1VideoAspectNative;
 
+  Dkc1VideoSetRenderWidth(kDkc1VideoNativeWidth + 2 * extra);
+}
+
+bool Dkc1VideoSetRenderWidth(int width) {
+  if (width < kDkc1VideoNativeWidth || width > kDkc1VideoMaxWidth || (width & 1))
+    return false;
+  const int extra = (width - kDkc1VideoNativeWidth) / 2;
   if (g_ws_extra != extra) {
     s_terrain_ready = false;
     s_presentation_bias = 0;
     Dkc1VideoResetPlacedActorPhases();
   }
-  g_ws_active = aspect != kDkc1VideoAspectNative;
+  g_ws_active = extra != 0;
   g_ws_extra = extra;
+  return true;
 }
 
 Dkc1VideoAspect Dkc1VideoGetAspect(void) {
@@ -239,7 +247,7 @@ Dkc1VideoAspect Dkc1VideoGetAspect(void) {
     return kDkc1VideoAspect16x10;
   if (g_ws_extra == kDkc1VideoWidescreenExtra)
     return kDkc1VideoAspect16x9;
-  return kDkc1VideoAspectNative;
+  return g_ws_extra ? kDkc1VideoAspectCustom : kDkc1VideoAspectNative;
 }
 
 void Dkc1VideoSetWidescreen(bool enabled) {

@@ -236,7 +236,8 @@ def run_ready_mode(*, runner: Path, rom: Path, snapshot: Path, output: Path,
                    level: int, mode: int, entrance: int, fade: int,
                    timeout: int, stable_frames: int, wide: bool,
                    prefetch_phase_guard: bool = False,
-                   prefetch_transaction_debug: bool = False) -> dict[str, Any]:
+                   prefetch_transaction_debug: bool = False,
+                   render_width: int = 342) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     script = output / "ready.dks"
     write_ready_script(script, level=level, mode=mode, entrance=entrance,
@@ -265,6 +266,7 @@ def run_ready_mode(*, runner: Path, rom: Path, snapshot: Path, output: Path,
         "DKC1_WRAM_OUTPUT": str(wram.resolve()),
         "DKC1_FRAME_PPM": str(frame.resolve()),
         "DKC1_WIDESCREEN": "1" if wide else "0",
+        "DKC1_RENDER_WIDTH": str(render_width if wide else 256),
         "DKC1_PREFETCH_PHASE_GUARD":
             "1" if prefetch_phase_guard else "0",
         "DKC1_PREFETCH_TRANSACTION_DEBUG":
@@ -297,7 +299,8 @@ def run_ready_mode(*, runner: Path, rom: Path, snapshot: Path, output: Path,
         except ValueError as error:
             result["ready_state_error"] = str(error)
     if wide and trace.exists():
-        result["widescreen_grade"] = grade_repeat(trace, strict=True)
+        result["widescreen_grade"] = grade_repeat(
+            trace, strict=True, extra=(render_width-256)//2)
     return result
 
 
@@ -305,7 +308,8 @@ def run_mode(*, runner: Path, rom: Path, snapshot: Path, output: Path,
              action: str, frames: int, entry_settle_frames: int,
              wide: bool, prefetch_phase_guard: bool = False,
              prefetch_transaction_debug: bool = False,
-             enter_before_stress: bool = True) -> dict[str, Any]:
+             enter_before_stress: bool = True,
+             render_width: int = 342) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     script = output / "input.dks"
     write_input_script(script, ACTIONS[action], frames, entry_settle_frames,
@@ -335,6 +339,7 @@ def run_mode(*, runner: Path, rom: Path, snapshot: Path, output: Path,
         "DKC1_WRAM_DUMP_PATH": str(wram.resolve()),
         "DKC1_FRAME_PPM": str(frame.resolve()),
         "DKC1_WIDESCREEN": "1" if wide else "0",
+        "DKC1_RENDER_WIDTH": str(render_width if wide else 256),
         # Never inherit this experimental gameplay switch from the caller.
         # A matrix must say whether it tested the guard, and its report must
         # retain that fact.  It is harmless in native mode because the runtime
@@ -374,7 +379,8 @@ def run_mode(*, runner: Path, rom: Path, snapshot: Path, output: Path,
         Path(str(oam_prefix) + ".bin"), extra=51)
     result["oam_budget"] = oam_budget(Path(str(oam_prefix) + ".jsonl"))
     if wide and trace.exists():
-        result["widescreen_grade"] = grade_repeat(trace, strict=True)
+        result["widescreen_grade"] = grade_repeat(
+            trace, strict=True, extra=(render_width-256)//2)
     return result
 
 
@@ -467,6 +473,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         help="neutral frames after the coarse level/fade/bounds predicates; "
              "64 clears the observed one-frame-wide entrance-walk skew")
     parser.add_argument("--repeats", type=int, default=1)
+    parser.add_argument("--render-width", type=int, default=342,
+                        help="Even wide source width, 258..448; native twin remains 256")
     parser.add_argument("--actions", default="neutral,right_y,left_y")
     parser.add_argument("--entrances",
                         help="optional comma-separated decimal/0x IDs")
@@ -480,6 +488,8 @@ def main(argv: Iterable[str] | None = None) -> int:
              "write set per pool ordinal to lifecycle.jsonl")
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
+        if not 258 <= args.render_width <= 448 or args.render_width % 2:
+            raise ValueError("--render-width must be even and in 258..448")
         actions = parse_csv_names(args.actions, ACTIONS)
         wanted = parse_entrances(args.entrances)
         source = json.loads(args.fresh_entry_report.read_text(encoding="utf-8"))
@@ -508,6 +518,7 @@ def main(argv: Iterable[str] | None = None) -> int:
                 "fresh_entry_report_sha256": sha256(args.fresh_entry_report),
             },
             "config": {"frames": args.frames,
+                       "render_width": args.render_width,
                        "entry_settle_frames": args.entry_settle_frames,
                        "align_gameplay_ready":
                            bool(args.align_gameplay_ready),
@@ -545,6 +556,7 @@ def main(argv: Iterable[str] | None = None) -> int:
                         entrance=target_entrance, fade=target_fade,
                         timeout=args.ready_timeout,
                         stable_frames=args.ready_stable_frames, wide=False,
+                        render_width=args.render_width,
                         prefetch_phase_guard=args.prefetch_phase_guard,
                         prefetch_transaction_debug=
                             args.prefetch_transaction_debug)
@@ -555,6 +567,7 @@ def main(argv: Iterable[str] | None = None) -> int:
                         entrance=target_entrance, fade=target_fade,
                         timeout=args.ready_timeout,
                         stable_frames=args.ready_stable_frames, wide=True,
+                        render_width=args.render_width,
                         prefetch_phase_guard=args.prefetch_phase_guard,
                         prefetch_transaction_debug=
                             args.prefetch_transaction_debug)
@@ -624,7 +637,8 @@ def main(argv: Iterable[str] | None = None) -> int:
                             prefetch_phase_guard=args.prefetch_phase_guard,
                             prefetch_transaction_debug=
                                 args.prefetch_transaction_debug,
-                            enter_before_stress=enter_before_stress))
+                            enter_before_stress=enter_before_stress,
+                            render_width=args.render_width))
                         wide_runs.append(run_mode(
                             runner=args.runner, rom=args.rom,
                             snapshot=wide_snapshot,
@@ -634,7 +648,8 @@ def main(argv: Iterable[str] | None = None) -> int:
                             prefetch_phase_guard=args.prefetch_phase_guard,
                             prefetch_transaction_debug=
                                 args.prefetch_transaction_debug,
-                            enter_before_stress=enter_before_stress))
+                            enter_before_stress=enter_before_stress,
+                            render_width=args.render_width))
                 deterministic = {
                     "native": bool(native_runs) and
                               len({mode_signature(run)
@@ -643,7 +658,7 @@ def main(argv: Iterable[str] | None = None) -> int:
                             len({mode_signature(run)
                                  for run in wide_runs}) == 1,
                 }
-                pairs = [compare_pair(native, wide, extra=43)
+                pairs = [compare_pair(native, wide, extra=(args.render_width-256)//2)
                          for native, wide in zip(native_runs, wide_runs)]
                 failures = sorted(set(alignment_failures) | {
                     item for pair in pairs for item in pair["failures"]})
