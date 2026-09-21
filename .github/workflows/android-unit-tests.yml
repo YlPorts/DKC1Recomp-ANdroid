@@ -1,0 +1,30 @@
+name: Android source tests (no ROM)
+on:
+  push:
+    branches: ['android/initial-port']
+    paths: ['android/**', 'APLICAR_PORT.py', '.github/workflows/android-unit-tests.yml']
+  pull_request:
+    paths: ['android/**', 'APLICAR_PORT.py', '.github/workflows/android-unit-tests.yml']
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: C, Java and Python tests; no game binaries or ROMs
+        run: python3 android/tools/run_tests.py --report android-unit-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-unit-report
+          path: android-unit-report.json
+          if-no-files-found: error
+          retention-days: 7

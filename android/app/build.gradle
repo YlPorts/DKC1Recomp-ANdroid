@@ -1,0 +1,53 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.ylports.dkc1recomp'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+    ndkVersion '28.2.13676358'
+    defaultConfig {
+        applicationId 'com.ylports.dkc1recomp.mobile'
+        minSdk 23
+        targetSdk 35
+        versionCode 3
+        versionName '0.3.0-dev'
+        ndk { abiFilters 'arm64-v8a' }
+        externalNativeBuild {
+            cmake { arguments '-DANDROID_STL=c++_static'; targets 'main', 'SDL2' }
+        }
+    }
+    externalNativeBuild { cmake { path file('../native/CMakeLists.txt'); version '3.22.1' } }
+    sourceSets.main.java.srcDir '../third_party/SDL2/android-project/app/src/main/java'
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildTypes {
+        debug { debuggable true; jniDebuggable true }
+        release { minifyEnabled false }
+    }
+    packaging { jniLibs { useLegacyPackaging false } }
+    lint { abortOnError true; lintConfig file("../lint.xml") }
+}
+
+// Include all relevant source notices with both APK variants, never ROM data.
+def noticeDir = layout.buildDirectory.dir('generated/licenseAssets')
+def prepareNotices = tasks.register('prepareLicenseAssets', Sync) {
+    into noticeDir.map { it.dir('licenses') }
+    from('../../LICENSE') { rename { 'DKC1Recomp-LICENSE.txt' } }
+    from('../../THIRD_PARTY_NOTICES.md') { rename { 'DKC1Recomp-THIRD-PARTY.md' } }
+    from('../LICENSE') { rename { 'Android-port-LICENSE.txt' } }
+    from('../THIRD_PARTY_NOTICES.md') { rename { 'Android-port-THIRD-PARTY.md' } }
+    from('../../snesrecomp/LICENSE') { rename { 'snesrecomp-LICENSE.txt' } }
+    from('../../snesrecomp/THIRD_PARTY_ATTRIBUTION.md') { rename { 'snesrecomp-THIRD-PARTY.md' } }
+    from('../../snesrecomp/third_party') {
+        include '**/LICENSE*', '**/COPYING*', '**/NOTICE*'
+        into 'snesrecomp-third-party'
+    }
+    from('../third_party/SDL2/LICENSE.txt') { rename { 'SDL2-LICENSE.txt' } }
+    from('../../snesrecomp/runner') {
+        include '**/LICENSE*', '**/license*', '**/COPYING*', '**/NOTICE*'
+        into 'snesrecomp-runner'
+    }
+}
+android.sourceSets.main.assets.srcDir(noticeDir)
+tasks.named('preBuild').configure { dependsOn prepareNotices }
