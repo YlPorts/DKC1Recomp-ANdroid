@@ -9,7 +9,7 @@ diff --git a/runner/dkc1_game.c b/runner/dkc1_game.c
 + * This remains opt-in until validated on-device. */
 +static bool Dkc1AndroidBonusSafeFallback(void) {
 +  const char *setting = getenv("DKC1_ANDROID_BONUS_SAFE");
-+  if (!setting || setting[0] != '1' || setting[1] != '\\0')
++  if (!setting || setting[0] != '1' || setting[1] != '\0')
 +    return false;
 +  return Dkc1ReadWram16(0x0032u) == 0x0001u &&
 +         Dkc1ReadWram16(0x0030u) == 0x0009u &&
