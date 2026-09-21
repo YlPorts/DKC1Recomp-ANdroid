@@ -1,0 +1,12 @@
+{
+  "package": "com.ylports.dkc1recomp.mobile",
+  "versionName": "1.6",
+  "versionCode": 109,
+  "baseVersion": "1.5",
+  "baseVersionCode": 106,
+  "baseApkSha256": "7ae498c0b0818a874090caecf0462a5afbf962f29df27f274acc495c3aa725cb",
+  "candidateApkSha256": "de95188b2c63570bad96f700fada2aef37a8dedfa576c0e389a0a50cca737f25",
+  "signingCertificateSha256": "d054ee3bb0a45e7c7625767c35aeeb8c2d66ec66e9b9570a1da3d627c13ae4b6",
+  "rendererChangesEnabled": false,
+  "bonusRambiPatch": "archived experimental only"
+}
