@@ -1,0 +1,35 @@
+# EXPERIMENTAL / NOT APPLIED BY DEFAULT
+# Preserved for source-level diagnosis of the Rambi/Jungle Hijinxs bonus issue.
+
+diff --git a/runner/dkc1_game.c b/runner/dkc1_game.c
+--- a/runner/dkc1_game.c
++++ b/runner/dkc1_game.c
+@@
++/* Android-only safety valve proposed for the fixed Jungle Hijinxs bonus room.
++ * This remains opt-in until validated on-device. */
++static bool Dkc1AndroidBonusSafeFallback(void) {
++  const char *setting = getenv("DKC1_ANDROID_BONUS_SAFE");
++  if (!setting || setting[0] != '1' || setting[1] != '\\0')
++    return false;
++  return Dkc1ReadWram16(0x0032u) == 0x0001u &&
++         Dkc1ReadWram16(0x0030u) == 0x0009u &&
++         Dkc1ReadWram16(0x003eu) == 0x0006u;
++}
++
+@@
++  const bool android_bonus_safe_fallback =
++      Dkc1VideoIsWidescreen() && Dkc1AndroidBonusSafeFallback();
++  if (android_bonus_safe_fallback)
++    wide_layer_mask = 0;
+@@
++    if (android_bonus_safe_fallback) {
++      Dkc1VideoSetTerrainReady(false);
++    } else if (stream_bootstrap_rejected) {
++      /* existing path */
++    }
+
+# Android host would opt in with:
+# setenv("DKC1_ANDROID_BONUS_SAFE", "1", 1);
+#
+# Do not enable this in production until the exact Rambi/bonus route has been
+# reproduced and validated on a real Android device.
