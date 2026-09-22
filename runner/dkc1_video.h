@@ -12,13 +12,16 @@ enum {
   /* SNES pixels present at a 7:6 pixel aspect. A symmetric 26-pixel margin
    * gives 308x224 (1.60417, the closest even-width 16:10 presentation), while
    * 43 pixels gives 342x224 (1.78125, within one source pixel of 16:9). The
-   * backing buffer remains sized for the largest supported presentation. */
+   * desktop backing buffers remain sized for the largest desktop preset. */
   kDkc1VideoWidescreen16x10Extra = 26,
   kDkc1VideoWidescreen16x10Width =
       kDkc1VideoNativeWidth + 2 * kDkc1VideoWidescreen16x10Extra,
   kDkc1VideoWidescreenExtra = 43,
   kDkc1VideoWidescreenWidth =
       kDkc1VideoNativeWidth + 2 * kDkc1VideoWidescreenExtra,
+  /* The pinned PPU has capacity for 96 extra columns per side. Mobile hosts
+   * can request an even width within this capacity without changing presets. */
+  kDkc1VideoMaxWidth = 448,
   kDkc1VideoBytesPerPixel = 4,
 };
 
@@ -26,6 +29,7 @@ typedef enum Dkc1VideoAspect {
   kDkc1VideoAspectNative = 0,
   kDkc1VideoAspect16x10,
   kDkc1VideoAspect16x9,
+  kDkc1VideoAspectCustom,
 } Dkc1VideoAspect;
 
 /* These symbols are the shared snesrecomp widescreen runtime contract. */
@@ -38,6 +42,10 @@ void Dkc1VideoSetWidescreen(bool enabled);
 bool Dkc1VideoIsWidescreen(void);
 void Dkc1VideoSetAspect(Dkc1VideoAspect aspect);
 Dkc1VideoAspect Dkc1VideoGetAspect(void);
+/* Select an even 256..448 source width. Invalid requests leave the current
+ * width untouched. The caller must allocate and bind a matching framebuffer.
+ * Existing calibration, fallback, activation and gameplay policies still apply. */
+bool Dkc1VideoSetRenderWidth(int width);
 void Dkc1VideoSetTerrainReady(bool ready);
 bool Dkc1VideoTerrainReady(void);
 int Dkc1VideoWidth(void);

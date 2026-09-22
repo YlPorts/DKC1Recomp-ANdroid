@@ -8,7 +8,12 @@ enum {
   kVerticalVelocity = 0x0EF1,
   kActorState = 0x1029,
   kMaximumActorSlot = 0x004E,
+#ifdef DKC1_DIXIE_VARIANT
+  /* Pinned mod bytes at $BF:A79F replace stock $0720 with $0900. */
+  kDkStompVelocity = 0x0900,
+#else
   kDkStompVelocity = 0x0720,
+#endif
   kDiddyStompVelocity = 0x0880,
 };
 

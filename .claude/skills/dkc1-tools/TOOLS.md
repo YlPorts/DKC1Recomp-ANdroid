@@ -3,17 +3,108 @@
 Companion to `SKILL.md`. Everything documented here lives in the repo;
 paths are repo-relative. `<rom>` = headerless DKC1 USA v1.0.
 
+## iOS host and cross-platform evidence
+
+`bash build_ios.sh iphonesimulator|iphoneos [ROM]` builds UIKit. Set
+`DKC1_IOS_TEAM` for signing; otherwise the device bundle is unsigned.
+`DKC1_IOS_DIAGNOSTICS=ON` embeds the existing headless runner and Metal graphics
+oracle for simulator QA;
+it is OFF for normal device builds.
+
+`verify_ios_simulator.py --simulator UDID --rom R --headless H --out NEW_DIR`
+compares three independent iOS and desktop replays of
+`recipes/route_jungle.dks` (override with `--route`, `--frames`). It requires
+frame/WRAM/VRAM/CGRAM/PPU-OAM/OAM-shadow/audio equality and writes raw evidence
+plus `comparison.json`. It replaces the selected diagnostic app's imported
+ROM and terminates it between runs; never target an active play session.
+`--verify` invokes the existing headless main after UIKit startup. Diagnostic
+interactive mode also accepts `DKC1_IOS_QA_PAUSED`, `DKC1_IOS_QA_LANDSCAPE`,
+`DKC1_IOS_QA_MENU`, `DKC1_IOS_QA_HOLD_Y` (with `QA_PAUSED` for the hold
+indicator), `DKC1_IOS_QA_ROLL_Y_B` (with `QA_PAUSED` for both pressed
+highlights), `DKC1_SAVESTATE_INPUT`, and the existing input/wait-only
+startup script. These new UI overrides are compiled out of device releases.
+`DKC1_IOS_QA_UPSCALER=0|1|2|3` selects nearest/bilinear/Reconstruct/Sharp
+Bilinear without saving the preference; `DKC1_IOS_QA_UPSCALING_MENU=1` opens
+the live-preview settings sheet. Pair these with the immutable state and
+paused/landscape flags for image comparison. They are display probes, not
+automated touch interaction.
+
+`--verify-graphics` invokes `tests/test_macos_graphics.m` unchanged inside the
+diagnostic app. Optional `Documents/graphics-source.ppm` supplies a P6 frame;
+otherwise it uses the test's synthetic pattern. `DKC1_TEST_SCALE` (1..16,
+default 4) and `DKC1_TEST_PIXEL_ASPECT=1` select output geometry. Outputs go
+to `Documents/graphics-qa/case-00.ppm` through `case-11.ppm`, with completion
+code in `result.txt` and metrics on stdout. Remove/move the previous result
+before another run. Prefix environment variables with `SIMCTL_CHILD_` when
+launching via `simctl`. Compare the PPMs with the normal macOS
+`test_macos_graphics` target. This checks GPU output/cache behavior without
+running or mutating a game session; it does not measure a physical phone GPU.
+Commands, evidence, the iOS 27 scene-crash fix and limits: `docs/IOS.md`.
+For publication, `scripts/package_ios.py --app APP --out NEW_DIR --version X.Y.Z
+--identity ID` checks committed build identity, excludes private provisioning,
+signs with Apple Distribution, verifies the extracted IPA and emits hashes.
+This profile-free sideload artifact requires recipient-side re-signing;
+the provisioned input app remains untouched. See `docs/RELEASE_0.0.14.md`.
+
+`--render-width 418` selects phone-width replay (default 256). Headless and
+layer capture accept `DKC1_RENDER_WIDTH`: even 256..448, overriding the aspect
+preset, unset by default. Their buffers cover the pinned PPU's 448 capacity.
+`fresh_entry_stress_sweep.py --render-width 418` keeps the native twin at 256
+and grades wide margins at 81 columns; its default stays 342/43 columns.
+`grade_repeat(..., extra=81)` supports that trace geometry. Use the matching
+`--extra 81` for the existing transition and region comparison tools.
+
 ## Build scripts (repo root)
 
 | script | purpose |
 |---|---|
 | `build_host_tools.bat` | Isolated tool-session build (own obj dir/exe names, never contends with the primary session): `build/dkc1_headless_tools.exe`, `dkc1_desktop_tools.exe`, `dkc1_layer_capture.exe` |
 | `build_host.bat` | Primary build: `dkc1_snesrecomp_headless.exe`, `dkc1_desktop.exe` |
+| `build_host_dixie.bat` / `build_host_dixie_tools.bat` | Optional Dixie debugger/headless variants; use a clean ROM, native presentation, and `contracts/dixie-jungle.json`. See `docs/DIXIE_MOD.md` for the SDL sibling and validated scope. |
 | `build_host_noadapt.bat` | Builds from a generated tree WITHOUT the widescreen adapters (`build/gen_noadapt`) — the no-adapter oracle used to prove adapter inertness |
 | `build_phaseguard_headless.bat` | Prefetch-phase-guard instrumented headless |
 | `rebuild_widescreen_runtime.bat` | Regenerate + rebuild after recomp/cfg changes |
 | `link_desktop_candidate.bat` / `rebuild_diagnostics_candidate.bat` | Link/rebuild under candidate exe names while a running visible exe holds the standard name |
 | `build/link_desktop_retry.bat` | Link tool-session desktop to `_new` name, then retry the standard name |
+
+`contracts/dixie-map-refresh.json` uses `recipes/dixie-map-refresh.dks` with
+`DKC1_SAVESTATE_INPUT` pointing to the immutable September 14 tester root
+(SHA-256 and commands in `docs/DIXIE_MAP_FIX_2026-09-14.md`). It checks three
+native map checkpoints over three identical replays and saves
+`refreshed_map.state` per repeat. This is a controller-only entry/exit refresh,
+not a general save repair or a clean-boot route. Preserve the original root
+outside normal slots. The variant's bounded expanded-ROM data-bank mapping is
+host cartridge configuration, enabled only by its verified loader/initializer;
+there is no environment switch or automatic stock-ROM mapper change.
+`tests/test_dixie_rom_mapping.py` compiles the actual resolver against synthetic
+storage; run from a compiler-equipped shell so this check is not skipped.
+
+`scripts/package_windows.py --build <CMake-build> --out <new-assets-directory>
+--version 0.0.13` packages both Windows executables, SDL2, licenses and user
+documentation from an explicit allowlist. It requires committed source, refuses
+to overwrite a ZIP, records file/build hashes in `BUILDINFO.json`, verifies ZIP
+contents and writes a SHA-256 sidecar. No ROM or private save is collected.
+
+The pinned Dixie engine also carries default-off bring-up taps:
+`SNESRECOMP_DMAQ_ZERO_WATCH=1` reports zero writes to the sprite DMA queue
+addresses with the last AOT function, and `SNESRECOMP_DMA_LOG=1` includes the
+function recorded at the DMA trigger. These are diagnostic attribution leads;
+the queue-address tap does not establish WRAM bank ownership by itself. See
+`docs/DIXIE_MOD.md`; neither tap enables the variant's compatibility behavior.
+
+Windows `--haptics-test` exercises the real rumble worker through an SDL virtual
+controller callback (pulse, disable, stop, idempotent worker start), without
+touching physical motors. CTest runs it for stock and Dixie. The Game menu has
+a persisted rumble toggle and physical test command; `DKC1_HAPTICS` overrides
+the saved `[Host] Haptics` preference at startup. `tests/test_haptics_probe.py`
+compiles the actual detector for both cartridge variants. The raw stomp trace,
+byte-grounded Dixie impulse and physical-device limitations are recorded in
+`docs/DIXIE_HAPTICS.md`. Existing WRAM dumps supply the frame evidence.
+`contracts/dixie-stomp.json` runs `recipes/dixie-stomp.dks` from clean boot,
+without a supplied state, proving grounded/falling/rebound/landing in three
+identical runs. The native test harness can optionally consume a private
+`00000-015ff` dump with arguments `<wram.bin> <expected-hit-frame>`; zero means
+no hits. It asserts exactly one hit at the named frame, or zero hits.
 
 All inject build identity (`git commit(+dirty) / config / timestamp`) shown
 in the window title, debug panel, and written to `<state>.buildinfo.json`
@@ -42,8 +133,10 @@ sidecars; loading a state from a different build warns.
 inward clamp released over eight margins of travel, `reflect`, `bars`,
 `shift` = pre-policy inward clamp, the A/B reference for wall reports),
 `DKC1_SCRIPT` (route .dks), `SNESRECOMP_INPUT_PLAY` (raw input replay),
-`DKC1_STARTUP_SCRIPT` (macOS input/wait-only .dks route run unthrottled before
-the first interactive frame; state and checkpoint directives fail closed),
+`DKC1_STARTUP_SCRIPT` (SDL Windows/macOS input/wait-only .dks route run
+unthrottled before the first interactive frame; state and checkpoint directives
+fail closed; each frame includes HDMA/render/VBlank; the native startup oracle
+is `recipes/dixie-jungle-startup.dks`, see `docs/DIXIE_QA_2026-09-13.md`),
 `DKC1_ALLOW_ROM_SHA256` (development-only exact 4 MB modified-ROM pin;
 retail verification remains the default and malformed/non-matching pins fail),
 `DKC1_SAVESTATE_INPUT` (load state at boot), `DKC1_SAVESTATE_OUTPUT` /
@@ -258,6 +351,13 @@ optional `quickload` leg seeded by a state the entry route itself saves.
 - `ingest_dkc1_disasm.py` — disassembly ingestion used for seeding.
 
 **Regression / sweeps**
+
+- `verify_ingame_saves.py --rom R --exe DESKTOP --headless HEADLESS
+  --entry-state S --input INPUT --frames N --restart-script ROUTE --out NEW_DIR`
+  — isolated three-repeat cartridge-save/disk/cold-restart validation. Native
+  snapshot v9 only; compares guest state with explicit source-verified host
+  audio-queue exclusions and preserves raw hashes. The restart leg never loads
+  a state. See `docs/INGAME_SAVES.md` for the Candy fixture and exact scope.
 - `analyze_pacing.py LOG [--warmup N] [--json]` — summarize desktop
   scheduler submit cadence separately from emulation/render work and GDI
   completion; v1 and v2 pacing logs are accepted.

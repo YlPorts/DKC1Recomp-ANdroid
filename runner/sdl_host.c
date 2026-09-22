@@ -6,6 +6,8 @@
  */
 #include "dkc1_blank_scan.h"
 #include "dkc1_baby_kong.h"
+#include "dkc1_dixie_mod.h"
+#include "snes/dma.h"
 #include "dkc1_debug_dump.h"
 #include "dkc1_flight_recorder.h"
 #include "dkc1_game.h"
@@ -17,6 +19,7 @@
 #include "input_playback.h"
 #include "desktop_audio_rate.h"
 #include "desktop_rewind.h"
+#include "desktop_sram.h"
 #include "desktop_input.h"
 #include "macos_controls.h"
 #include "macos_pause_menu.h"
@@ -73,6 +76,8 @@ enum {
 };
 
 static const double kHostPresentationFramesPerSecond = 60.0;
+static Dkc1SramStore s_sram_store;
+static int s_sram_error_reported;
 static const double kMacNativeDisplayFramesPerSecond = 120.0;
 static const double kHostWorkGuardSeconds = 0.006;
 static const double kMacSubmitLeadSeconds = 0.004;
@@ -240,6 +245,13 @@ static int RunStartupScript(char *error, size_t error_size) {
   if (!Dkc1ScriptLoad(path, error, error_size))
     return 0;
 
+  /* Rendering also executes HDMA and the VBlank OAM-port reload. Skipping it
+   * during a fast startup misaligns subsequent OAM uploads even though WRAM
+   * and VRAM still match the normal frame loop. Use an offscreen buffer until
+   * InitVideo creates the window. */
+  s_width = Dkc1VideoWidth();
+  Dkc1BeginDrawing(s_pixels, (size_t)s_width * 4);
+
   const long frame_limit = 30000;
   long frames = 0;
   while (!Dkc1ScriptFinished()) {
@@ -274,6 +286,7 @@ static int RunStartupScript(char *error, size_t error_size) {
       Dkc1ScriptFree();
       return 0;
     }
+    Dkc1DrawPpuFrame();
   }
   Dkc1ScriptFree();
   fprintf(stderr, "startup: completed %s in %ld frames\n", path, frames);
@@ -802,13 +815,17 @@ static void UpdateWindowTitle(void) {
 }
 
 static void UpdateTitle(void) {
+#ifdef _WIN32
+  Dkc1WindowsUpdateHapticsMenu(s_haptics_enabled);
+#endif
   UpdateWindowTitle();
   Dkc1MacUpdateMenuState(s_paused, s_fullscreen,
                          s_fullscreen_scaling,
                          Dkc1VideoGetAspect(), Dkc1VideoGetEdgePolicy(),
                          Dkc1DebugLayerMask(),
                          Dkc1DebugProvenanceOverlay(), s_msu1 != NULL,
-                         Dkc1BabyKongEnabled(), Dkc1BabyKongReady());
+                         0, 0,  /* Baby Kong removed from the Mods menu */
+                         Dkc1DixieIsVariant() || Dkc1DixieSavedEnabled());
   Dkc1MacUpdateGraphicsMenuState(s_graphics.display,s_graphics.upscaler,s_graphics.screen);
 }
 
@@ -824,24 +841,6 @@ static char *ConfiguredMusicPackPath(void) {
     return copy;
   }
   return Dkc1MacSavedMsu1();
-}
-
-static void ChooseBabyKongRom(void) {
-  char *path = Dkc1MacChooseBabyKongRom();
-  if (!path)
-    return;
-  char error[192];
-  if (Dkc1BabyKongLoadRom(path, error, sizeof error)) {
-    Dkc1BabyKongSetEnabled(true);
-    Dkc1MacSetBabyKongRom(path);
-    Dkc1MacSetBabyKongEnabled(1);
-    snprintf(s_status, sizeof s_status, "Baby Kong enabled | %zu frames",
-             Dkc1BabyKongFrameCount());
-  } else {
-    ShowError("Unsupported DKC3 ROM", error);
-    snprintf(s_status, sizeof s_status, "Baby Kong: %.160s", error);
-  }
-  free(path);
 }
 
 static uint16_t ReadWram16(size_t address) {
@@ -1201,7 +1200,7 @@ static int SDLCALL HapticWorkerMain(void *unused) {
 }
 
 static bool HapticWorkerStart(void) {
-  if (!s_haptics_enabled)
+  if (!s_haptics_enabled || s_haptic_worker.thread)
     return true;
   Dkc1HapticWorker *worker = &s_haptic_worker;
   worker->mutex = SDL_CreateMutex();
@@ -1274,6 +1273,45 @@ static void PulseStompHaptic(void) {
    * controller input or blocking the frame-critical thread on Bluetooth I/O. */
   HapticWorkerRequest(kHapticRequestPulse);
 }
+
+#ifdef _WIN32
+/* ROM-free output test using SDL's virtual device callback, not physical motors. */
+static SDL_atomic_t s_test_rumble_pulses, s_test_rumble_stops;
+static int SDLCALL TestRumbleCallback(void *unused, Uint16 low, Uint16 high) {
+  (void)unused;
+  if (low == 0x2800 && high == 0x5000) SDL_AtomicAdd(&s_test_rumble_pulses,1);
+  if (!low && !high) SDL_AtomicAdd(&s_test_rumble_stops,1);
+  return 0;
+}
+static int HapticOutputTest(void) {
+  SDL_VirtualJoystickDesc desc = {0};
+  desc.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION;
+  desc.type=SDL_JOYSTICK_TYPE_GAMECONTROLLER;
+  desc.naxes=SDL_CONTROLLER_AXIS_MAX;desc.nbuttons=SDL_CONTROLLER_BUTTON_MAX;
+  desc.name="DKC1 rumble output test";desc.Rumble=TestRumbleCallback;
+  int device=SDL_JoystickAttachVirtualEx(&desc), result=1;
+  if (device<0) return 1;
+  s_controller=SDL_GameControllerOpen(device);
+  if (!s_controller || !SDL_GameControllerHasRumble(s_controller)) goto done;
+  s_haptics_enabled=1;
+  if (!HapticWorkerStart() || !HapticWorkerStart()) goto done;
+  PulseStompHaptic();
+  for(int i=0;i<100 && !SDL_AtomicGet(&s_test_rumble_pulses);i++)SDL_Delay(5);
+  if(SDL_AtomicGet(&s_test_rumble_pulses)!=1)goto done;
+  s_haptics_enabled=0;StopControllerRumble();PulseStompHaptic();
+  for(int i=0;i<100 && !SDL_AtomicGet(&s_test_rumble_stops);i++)SDL_Delay(5);
+  SDL_Delay(20);
+  if(SDL_AtomicGet(&s_test_rumble_pulses)!=1 || !SDL_AtomicGet(&s_test_rumble_stops))goto done;
+  result=0;
+done:
+  HapticWorkerStop();
+  if(s_controller)SDL_GameControllerClose(s_controller);
+  s_controller=NULL;SDL_JoystickDetachVirtual(device);
+  if(!result)puts("HAPTICS_OUTPUT_PASS: real worker pulse, disable and stop reach the SDL virtual-controller driver");
+  else fprintf(stderr,"Haptics output test failed: %s\n",SDL_GetError());
+  return result;
+}
+#endif
 
 static void ControllerRemoved(SDL_JoystickID instance) {
   for (int p = 0; p < 2; p++) {
@@ -1682,12 +1720,22 @@ static void SetAspectMode(Dkc1VideoAspect requested) {
 
 static void SetFullscreen(int fullscreen) {
   s_fullscreen = fullscreen != 0;
+#ifdef _WIN32
+  /* The native menu bar would otherwise remain drawn across the top of the
+   * borderless fullscreen window and shorten the drawable. */
+  if (s_fullscreen)
+    Dkc1WindowsShowMenuBar(0);
+#endif
   if (SDL_SetWindowFullscreen(
           s_window, s_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) != 0) {
     s_fullscreen = !s_fullscreen;
     snprintf(s_status, sizeof s_status, "fullscreen change failed: %.170s",
              SDL_GetError());
   }
+#ifdef _WIN32
+  /* Restore before ApplyWindowedSize so SDL accounts for the bar height. */
+  Dkc1WindowsShowMenuBar(!s_fullscreen);
+#endif
   s_graphics.fullscreen=s_fullscreen; Dkc1MacSaveGraphics(&s_graphics);
   ApplyPresentationGeometry();
   if (!s_fullscreen)
@@ -1843,6 +1891,28 @@ static void HandleKey(SDL_Keycode key, SDL_Keymod mod) {
 
 void Dkc1MacMenuCommand(int command) {
   switch (command) {
+#ifdef _WIN32
+    case kDkc1MacMenuToggleHaptics:
+      s_haptics_enabled = !s_haptics_enabled;
+      if (s_haptics_enabled && !HapticWorkerStart()) {
+        s_haptics_enabled = 0;
+        ShowError("Controller rumble", SDL_GetError());
+      }
+      if (!s_haptics_enabled) StopControllerRumble();
+      Dkc1WindowsSetHaptics(s_haptics_enabled);
+      snprintf(s_status, sizeof s_status, "controller stomp haptics %s",
+               s_haptics_enabled ? "on" : "off");
+      break;
+    case kDkc1MacMenuTestHaptics:
+      if (!s_haptics_enabled) break;
+      if (!s_controller || !SDL_GameControllerHasRumble(s_controller)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,"Controller rumble",
+            "Connect a game controller with rumble support to test enemy-stomp feedback.",s_window);
+      } else {
+        PulseStompHaptic();
+      }
+      break;
+#endif
     case kDkc1MacMenuUpscalerReconstruct:
     case kDkc1MacMenuDisplayFlat:
     case kDkc1MacMenuDisplayCrt:
@@ -1901,17 +1971,33 @@ void Dkc1MacMenuCommand(int command) {
       ExportRepro();
       return;
     case kDkc1MacMenuToggleBabyKong:
-      if (!Dkc1BabyKongReady()) {
-        ChooseBabyKongRom();
-      } else {
-        Dkc1BabyKongSetEnabled(!Dkc1BabyKongEnabled());
-        Dkc1MacSetBabyKongEnabled(Dkc1BabyKongEnabled());
-        snprintf(s_status, sizeof s_status, "%s",
-                 Dkc1BabyKongStatus());
-      }
+      /* Removed: Baby Kong (Kiddy) is no longer offered; the menu item is
+       * gone, so this is unreachable. */
       break;
     case kDkc1MacMenuChooseBabyKongRom:
-      ChooseBabyKongRom();
+      break;
+    case kDkc1MacMenuToggleDixie:
+      /* The Dixie mod is a full recompilation variant: toggling persists the
+       * choice and relaunches the sibling executable (see dkc1_dixie_mod.h).
+       * In the variant build this item switches back to stock. No ROM picker
+       * is needed: the variant synthesizes the modded image from the same
+       * clean-ROM argument. */
+      if (Dkc1DixieIsVariant()) {
+        Dkc1DixieSwitchAndRelaunch(0, "dkc1_dixie_desktop.exe",
+                                   "DKC1Recomp.exe", s_status,
+                                   sizeof s_status);
+      } else if (!Dkc1DixieSavedEnabled()) {
+        Dkc1DixieSwitchAndRelaunch(1, "dkc1_dixie_desktop.exe",
+                                   "DKC1Recomp.exe", s_status,
+                                   sizeof s_status);
+      } else {
+        Dkc1DixieSetEnabled(0);
+        snprintf(s_status, sizeof s_status,
+                 "Dixie Kong Country will stay off from now on");
+      }
+      break;
+    case kDkc1MacMenuChooseDixieRom:
+      /* Removed: the mod ROM is synthesized; there is nothing to pick. */
       break;
     case kDkc1MacMenuChooseMusicPack: {
       char *path = Dkc1MacChooseMsu1();
@@ -2071,6 +2157,24 @@ static void Cleanup(uint8_t *rom) {
 
 int main(int argc, char **argv) {
   SDL_SetMainReady();
+  /* Optional Dixie Kong Country mod: when the persisted setting is on, this
+   * stock build hands the session to the sibling variant executable before
+   * SDL starts. */
+  {
+    char note[256];
+    if (Dkc1DixieHandoffCheck(argc, argv, "dkc1_dixie_desktop.exe", note,
+                              sizeof note)) {
+      return 0; /* the variant executable owns the session */
+    }
+    if (note[0]) fprintf(stderr, "dixie mod: %s\n", note);
+
+#ifdef DKC1_DIXIE_VARIANT
+  /* The mod's sprite-DMA queue emits zero-size entries that the
+   * hack's target emulator dropped; guard VRAM from the stomps.
+   * (See dma_set_zero_size_vram_noop in snes/dma.h.) */
+  dma_set_zero_size_vram_noop(1);
+#endif
+  }
 #ifndef _WIN32
   (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
 #else
@@ -2092,6 +2196,9 @@ int main(int argc, char **argv) {
   if (argc>1 && strcmp(argv[1],"--graphics-test")==0) {
     int result=Dkc1WindowsGraphicsTest(); SDL_Quit(); return result;
   }
+  if (argc>1 && strcmp(argv[1],"--haptics-test")==0) {
+    int result=HapticOutputTest(); SDL_Quit(); return result;
+  }
   if (argc==3 && strcmp(argv[1],"--platform-test")==0) {
     int result=Dkc1WindowsPlatformTest(argv[2]); SDL_Quit(); return result;
   }
@@ -2103,10 +2210,27 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  Dkc1DixieSetRomPath(rom_path);
+  {
+    char note[256];
+    /* A no-argument launch only has a ROM after the picker/cache resolves it. */
+    if (Dkc1DixieHandoffCheck(0, NULL, "dkc1_dixie_desktop.exe", note,
+                            sizeof note)) {
+      SDL_Quit();
+      return 0;
+    }
+    if (note[0]) fprintf(stderr, "dixie mod: %s\n", note);
+  }
+
   size_t rom_size = 0;
   char rom_error[192];
+#ifdef DKC1_DIXIE_VARIANT
+  uint8_t *rom = Dkc1DixieLoadRom(rom_path, &rom_size, rom_error,
+                                  sizeof rom_error);
+#else
   uint8_t *rom =
       Dkc1ReadVerifiedRom(rom_path, &rom_size, rom_error, sizeof rom_error);
+#endif
   if (!rom) {
     char message[PATH_MAX + 256];
     snprintf(message, sizeof message, "%s\n\n%s", rom_error, rom_path);
@@ -2165,22 +2289,17 @@ int main(int argc, char **argv) {
     SDL_Quit();
     return 4;
   }
+  if (!Dkc1SramLoad(&s_sram_store, g_sram, (size_t)g_sram_size,
+                    rom_error, sizeof rom_error)) {
+    ShowError("Unable to load in-game saves", rom_error);
+    free(rom);
+    SDL_Quit();
+    return 13;
+  }
 
-  if (!getenv("DKC1_BABY_KONG_ROM")) {
-    char *baby_rom = Dkc1MacSavedBabyKongRom();
-    if (baby_rom) {
-      char baby_error[192];
-      if (!Dkc1BabyKongLoadRom(baby_rom, baby_error, sizeof baby_error))
-        fprintf(stderr, "warning: Baby Kong disabled: %s\n", baby_error);
-      free(baby_rom);
-    }
-  }
-  if (Dkc1BabyKongReady()) {
-    const char *baby_enabled = getenv("DKC1_BABY_KONG");
-    Dkc1BabyKongSetEnabled(
-        baby_enabled ? EnvironmentEnabled("DKC1_BABY_KONG")
-                     : Dkc1MacSavedBabyKongEnabled() != 0);
-  }
+  /* Baby Kong was removed from the Mods menu (Dixie Kong Country is the only
+   * character option now); its persisted state is intentionally ignored so
+   * old settings cannot silently reactivate it. */
 
   const char *snapshot = getenv("DKC1_SAVESTATE_INPUT");
   if (snapshot && *snapshot && !RtlLoadSnapshot(snapshot)) {
@@ -2213,8 +2332,11 @@ int main(int argc, char **argv) {
 
   s_paused = EnvironmentEnabled("DKC1_START_PAUSED");
   s_fullscreen_scaling = Dkc1MacSavedFullscreenScaling();
-  s_haptics_enabled = !getenv("DKC1_HAPTICS") ||
-                      EnvironmentEnabled("DKC1_HAPTICS");
+#ifdef _WIN32
+  s_haptics_enabled = Dkc1WindowsSavedHaptics();
+#endif
+  if (getenv("DKC1_HAPTICS"))
+    s_haptics_enabled = EnvironmentEnabled("DKC1_HAPTICS");
   if (!HapticWorkerStart()) {
     fprintf(stderr, "warning: haptic worker unavailable: %s\n",
             SDL_GetError());
@@ -2242,6 +2364,11 @@ int main(int argc, char **argv) {
   }
   Dkc1MacLoadControls(&s_controls);
   Dkc1MacInstallMenu();
+#ifdef _WIN32
+  /* Attaching the menu bar takes its height from the client area SDL just
+   * created; restore the integer-scaled client size beneath it. */
+  ApplyWindowedSize();
+#endif
   InitAudio();
   OpenFirstController();
 
@@ -2433,6 +2560,12 @@ int main(int argc, char **argv) {
       s_running = 0;
       break;
     }
+    if (!Dkc1SramFlush(&s_sram_store, g_sram, (size_t)g_sram_size,
+                       false, error, sizeof error) && !s_sram_error_reported) {
+      s_sram_error_reported = 1;
+      s_paused = 1;
+      ShowError("Unable to write in-game saves", error);
+    }
     phase_start = phase_end;
     Dkc1DrawPpuFrame();
     phase_end = FramePacerNow();
@@ -2554,6 +2687,13 @@ int main(int argc, char **argv) {
   FramePacerPrintStats(&pacer);
   DisplayPacerPrintStats(&display_pacer);
   PacingLogClose(&pacing_log);
+  char save_error[256];
+  /* A failed emulation frame may contain partial cartridge writes. The last
+   * successful frame was already flushed; never persist off-rails memory. */
+  bool saved = g_fail || !Dkc1LastLleResult() ||
+      Dkc1SramFlush(&s_sram_store, g_sram, (size_t)g_sram_size,
+                    true, save_error, sizeof save_error);
+  if (!saved) ShowError("Unable to write in-game saves", save_error);
   Cleanup(rom);
-  return 0;
+  return saved ? 0 : 13;
 }

@@ -10,6 +10,7 @@
 #include "common_rtl.h"
 #include "cpu_state.h"
 #include "snes/dma.h"
+#include "snes/cart.h"
 #include "snes/interp_bridge.h"
 #include "snes/ppu.h"
 #include "snes/saveload.h"
@@ -63,7 +64,17 @@ static void Dkc1InterpreterInitialColumnCount(CpuState *cpu,
 }
 
 static void Dkc1Initialize(void) {
-  Dkc1BabyKongInitializeFromEnvironment();
+#ifdef DKC1_DIXIE_VARIANT
+  /* The pinned Dixie image adds pose/layout/graphics data in banks $40-$41.
+   * For example pose-table entry $BB:F8A8 points to $41:6000, file $416000.
+   * Folding that to $01:6000 reads unrelated tiles as an OAM layout. Keep
+   * the existing $C0-$FF stock aliases and enable only the added data banks.
+   * This is set before reset and remains host configuration across loads. */
+  cart_set_hirom_linear_data_banks(g_snes->cart, true);
+#endif
+  /* Baby Kong (Kiddy) was removed from the Mods menu and cannot be enabled:
+   * its env initializer is intentionally not called, so DKC1_BABY_KONG* has
+   * no effect even if set. The compiled hooks remain inert. */
   /* The main engine can reach both initializers while executing through the
    * bank-$00 HiROM interpreter mirror. Generated-C adapters alone therefore
    * miss those entries. Mirror the same two constant substitutions at the

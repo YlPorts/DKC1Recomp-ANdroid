@@ -1,5 +1,18 @@
 # Windows SDL/OpenGL release
 
+Current Windows release: [v0.0.13, Dixie Kong update](RELEASE_0.0.13.md).
+The sections below retain the earlier host validation history.
+
+## v0.0.12 in-game saves
+
+Candy saves now persist between launches in
+`%APPDATA%/Flat2VR/DKC1Recomp/saves/save.srm`. The host loads cartridge SRAM
+before boot and atomically writes changed data. Read/write failures are
+reported; malformed files and failed writes preserve the previous save.
+Save-state formats are unchanged. See [save recovery and validation](INGAME_SAVES.md).
+The v0.0.12 binary release is Windows x64 only; older Mac downloads still have
+the missing SRAM persistence and are not repackaged as fixed builds.
+
 The v0.0.10 Windows host shares `sdl_host.c` and the Mac host's graphics,
 audio-rate, input, refresh, rewind, CRT and color-filter models. Windows supplies
 native dark menus/settings, INI preferences, file pickers, memory mapping,
@@ -34,13 +47,18 @@ No ROM, extracted assets or private state belongs in the release ZIP.
 | Controls | Both players' keyboard/gamepad bindings, source routing and analog deadzones; controller pause navigation |
 | Assist / states | Opt-in rewind, 3x fast-forward, four remappable host actions, five independent state slots |
 | Sound | Canonical game audio, host-only drift correction, mute/volume; MSU-1 folder or bounded `.msu1`/ZIP import |
-| Mods | Verified private DKC3-ROM Baby Kong source; original animation/movement code; saved enable state |
+| Mods | v0.0.13: optional Dixie Kong Country sibling, verified clean DKC1-ROM synthesis, saved enable state; replaces the previous Baby Kong menu option |
 | Aquatic presentation | Same five experimental flags; saved opt-in applies next launch and remains off by default |
 
 Escape opens the pause panel (exits fullscreen first), F7 pauses/resumes, F8
 steps, F11/F12 save/load the selected slot, F9 exports a private repro, and
 Alt+Enter toggles fullscreen. Game/View/Mods/Music expose the native dropdowns.
+The menu bar is detached while fullscreen and reattached on return to windowed
+mode, so the borderless fullscreen drawable covers the whole display.
 Settings are in `%APPDATA%/Flat2VR/DKC1Recomp/windows.ini`, beside user states.
+The Game menu exposes **Controller rumble (enemy stomps)** and a test pulse.
+It defaults on and persists under `[Host] Haptics`; `DKC1_HAPTICS=0/1`
+overrides that preference at startup. See [the Dixie haptics fix](DIXIE_HAPTICS.md).
 `DKC1_USER_DIR` redirects both Windows settings and states to an existing
 absolute private directory. It does not modify Mac NSUserDefaults.
 
@@ -49,6 +67,26 @@ GLSL, retaining the shader arithmetic and shared parameter derivation. It reads
 only completed immutable pixels. Mac CADisplayLink/Metal is retained on Mac;
 Windows uses QPC deadlines and one main-thread GL submission. This is not a
 claim of identical scanout behavior or Mac hardware validation on Windows.
+
+## v0.0.11 fullscreen menu bar
+
+A Win32 menu bar is non-client area, so it stayed drawn across the top of the
+borderless `SDL_WINDOW_FULLSCREEN_DESKTOP` window and shortened the OpenGL
+drawable by its height. `SetFullscreen` now calls `Dkc1WindowsShowMenuBar(0)`
+before entering fullscreen and `Dkc1WindowsShowMenuBar(1)` after leaving it,
+before `ApplyWindowedSize` so SDL's frame adjustment accounts for the bar. The
+HMENU and its checkmarks persist across detachment; `windows_platform` asserts
+detach/restore and retained menu state. Attaching the bar at startup had also
+taken its height from the freshly created client area (1197x628 instead of
+1197x672 at 3x/16:9 on a 200% display), so the host now reapplies the windowed
+size after `Dkc1MacInstallMenu`. No Mac, cartridge or widescreen change.
+
+Live check on the private ROM (isolated `DKC1_USER_DIR`, 3456x2170 display):
+View > Fullscreen and Alt+Enter both left `GetMenu()` NULL with a `WS_POPUP`
+window whose client area equalled the monitor; the menu item, Alt+Enter and
+Escape returns each restored the bar and a 1197x672 client at the original
+position. Screenshots showed the boot logos across the whole display with no
+bar.
 
 ## Verification and limits
 

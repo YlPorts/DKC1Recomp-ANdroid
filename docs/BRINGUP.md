@@ -1,5 +1,16 @@
 # DKC1 bring-up log
 
+## Windows v0.0.11 fullscreen menu bar
+
+A tester reported the Game/View/Mods/Music bar staying on screen in fullscreen.
+The Win32 menu bar is non-client area, so SDL's borderless fullscreen popup kept
+drawing it and lost its height from the drawable. `SetFullscreen` now detaches
+the bar before entering fullscreen and reattaches it after leaving, ahead of the
+windowed resize; startup also reapplies the windowed size after the bar is
+installed so first launch is integer-scaled. Verified live with the private ROM
+through the menu item, Alt+Enter and Escape, and by the extended
+`windows_platform` test. Host-only; no cartridge, widescreen or Mac change.
+
 ## Windows v0.0.10 host parity
 
 The legacy Windows frontend did not expose the Mac v0.0.9 graphics and controls

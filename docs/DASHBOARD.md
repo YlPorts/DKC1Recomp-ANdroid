@@ -1,11 +1,14 @@
 # DKC1Recomp regression dashboard
 
-Generated 2026-09-06 21:08 UTC at commit `ee6d662-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
+Generated 2026-09-15 00:47 UTC at commit `f4c82a2-dirty`. Regenerate with `python tools/make_dashboard.py` after a regression/sweep cycle.
 
 ## Contracts
 
 | contract | last result | legs | evidence |
 |---|---|---|---|
+| dixie-jungle (`dixie-jungle.json`) | NOT RUN in latest cycle | - | - |
+| dixie-map-refresh (`dixie-map-refresh.json`) | NOT RUN in latest cycle | - | - |
+| dixie-stomp (`dixie-stomp.json`) | NOT RUN in latest cycle | - | - |
 | jungle-death-transition (`jungle-death-transition.json`) | NOT RUN in latest cycle | - | - |
 | jungle-entry (`jungle-entry.json`) | NOT RUN in latest cycle | - | - |
 
@@ -17,6 +20,14 @@ _No sweep report; run `python tools/level_sweep.py`._
 
 | id | status | summary | repro |
 |---|---|---|---|
+| ios-single-thumb-run-jump-roll | fixed | A thumb that began on Y could not also press B by rolling across the touch diamond; the preceding adapter update handled separate fingers only. | `Press Y with one thumb, roll toward B without lifting, roll back to Y, then repeat.` |
+| ios-simultaneous-run-jump-touch | fixed | The original UIKit game buttons used transient highlight state for input; the player needs reliable Y+B chords and a double-tap Y hold toggle. | `Keep Y pressed and press/release B repeatedly. Double-tap Y, lift the finger, jump with B, then double-tap Y again.` |
+| ios-landscape-stretched-native-image | fixed | The first iOS landscape overlay stretched a 256x224 framebuffer to the phone aspect, distorting the game. | `Load the iOS game and enter landscape; distortion appeared on the first displayed landscape frame.` |
+| ios27-scene-lifecycle-launch | fixed | The initial UIKit device build traps before the first game frame on iOS 27 because it creates an application window without adopting scene lifecycle. | `Launch the initial signed arm64 build on iPhone 16 Pro Max running iOS 27.0 (24A5408d). The iOS 26.5 simulator does not enforce the requirement.` |
+| dixie-stomp-haptics | fixed | Dixie enemy stomps produce no feedback because the host compares her rebound to stock DK's value; the Windows host also lacks visible rumble controls. | `contracts/dixie-stomp.json: fresh boot, falling at frame 7749, stomp at 7750. Equivalent immutable Jungle-state route reaches the stomp at relative frame 149.` |
+| dixie-map-sprite-corruption | fixed | The optional Dixie variant shows conspicuous garbage sprite clusters on Kongo Jungle and Jungle entrance maps, including after death. Fresh controller-only boot reproduces it; Jungle gameplay is clean in the inspected movement branches. | `Dixie headless, native mode, first 5750 frames of recipes/dixie-jungle-startup.dks from the verified clean ROM; tracked Jungle-map OAM cluster begins at frame 5728, with earlier corruption on the preceding map.` |
+| sdl-startup-route-oam-port-timing | fixed | Input-only SDL startup routes skipped the per-frame drawing/HDMA/VBlank step, leaving PPU OAM uploads misaligned and visibly corrupting both stock and Dixie sprites at first interactive presentation. | `DKC1_STARTUP_SCRIPT=recipes/dixie-jungle-startup.dks, native mode, clean boot; Dixie first interactive frame 7602.` |
+| dixie-windows-relaunch-integration | fixed | Dixie menu restarts lost the selected ROM path and the SDL variant could return to the debugger filename; the regular Windows build lacked a matching SDL variant target. | `Toggle Mods > Dixie Kong Country in both Windows hosts with a clean ROM path containing spaces; also start SDL with a persisted choice and cached ROM.` |
 | no-contact-damage | fixed | Contact damage never lands: DK overlaps the first Gnawty for 3800+ frames unharmed in BOTH native and wide modes, and identically under forced LLE (not a dispatch/widescreen defect). | `recipes/route_death.dks` |
 | entry-wide-centered-flap | open | WIDE<->CENTERED presentation flap during level entry (frames 7304-7331 of the jungle route). | `recipes/route_jungle.dks with DKC1_WS_TRACE` |
 | wide-world-key-unwrap | open | Wide world key camX=$FFF0 (-16) unwrap artifact near level start. | `recipes/route_jungle.dks with DKC1_WS_TRACE` |
@@ -40,5 +51,6 @@ _No sweep report; run `python tools/level_sweep.py`._
 | coral-capers-populated-wall-seam | open | Two supplied Coral Capers states expose opposite faces of a mismatched authored wall junction. Source-verified, default-off margin corrections are available for local playtesting. | `build/repros/water-seam-20260906/inputs/quicksave.state; frame 34978, mode 3, level $0061, entrance $00BF, camera 943/10113; right-face follow-up: build/repros/water-right-seam-20260906/inputs/quicksave.state, frame 78551, camera 671/10048` |
 | aquatic-fine-scroll-bottom-row-gap | open | Ordinary fine-Y=7 scrolling can expose a short strip of BG2 on the last scanline because the native edge tile guard row was captured only during a cache rebase. The local opt-in correction is validated; whole-game promotion remains pending. | `recipes/coral-bottom-row-guard.json from active Coral root 1eb7355de0dbc3ff8250d526611e0154fe446e590c1c1e43786a57a99e2be316; first miss at relative frame 85, absolute 110691, camera 592/10000` |
 | coral-western-alcove-margin-gaps | open | The western Coral Capers alcove and higher shaft expose right-margin gaps in unused map cells. Separate source-verified local corrections are available; full promotion remains pending. | `build/repros/water-new-junction-20260906/inputs/quicksave.state; frame 541651, mode 3, level $0061, entrance $00BF, camera 127/9797; higher shaft: build/repros/water-upper-alcove-20260906/inputs/quicksave.state, frame 553153, camera 16/9380` |
+| ingame-sram-not-persisted | fixed | Candy in-game saves existed only in process SRAM: desktop hosts never loaded or wrote a battery file, so progress disappeared on restart while save states worked. | `docs/INGAME_SAVES.md; tools/verify_ingame_saves.py with the private pre-Candy entry fixture and fixed 478-frame save input` |
 
 Issue lifecycle: edit `docs/KNOWN_ISSUES.json` (set status `fixed` with the fixing commit) and regenerate. A fixed issue regressing shows up here as its contract/sweep line failing.

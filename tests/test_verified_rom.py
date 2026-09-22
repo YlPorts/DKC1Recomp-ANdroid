@@ -84,6 +84,11 @@ class VerifiedRomTests(unittest.TestCase):
                 [str(executable), str(rom_path)], env=environment)
             self.assertEqual(malformed.returncode, 2)
 
+            oversized = directory / "oversized.sfc"
+            oversized.write_bytes(bytes([0x5A]) * 0x600000)
+            rejected_oversized = subprocess.run([str(executable), str(oversized)])
+            self.assertEqual(rejected_oversized.returncode, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

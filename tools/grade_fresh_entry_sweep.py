@@ -80,7 +80,8 @@ def _classify_centered(rows: list[dict[str, Any]]) -> str:
     return "centered_unknown"
 
 
-def grade_repeat(trace_path: Path, *, strict: bool = False) -> dict[str, Any]:
+def grade_repeat(trace_path: Path, *, strict: bool = False,
+                 extra: int = 43) -> dict[str, Any]:
     rows = _read_jsonl(trace_path)
     gameplay = [r for r in rows if int(r.get("scene", {}).get("mode", -1)) != 3
                 or int(r.get("scene", {}).get("level", -1)) != 0x25
@@ -110,7 +111,7 @@ def grade_repeat(trace_path: Path, *, strict: bool = False) -> dict[str, Any]:
     strict_summary = None
     if strict:
         strict_summary = analyze_ws_trace(
-            load_ws_trace(trace_path), max_findings=100000, extra=43)
+            load_ws_trace(trace_path), max_findings=100000, extra=extra)
         strict_checks = {
             "trace_policy_violation": strict_summary["policy_violations"],
             "centered_nonblack_margin":

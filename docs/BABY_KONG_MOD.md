@@ -1,5 +1,12 @@
 # Baby Kong mod
 
+> **Removed from the UI (2026-09-13).** Baby Kong (the Kiddy Kong
+> presentation) was taken out of the Mods menu when Dixie Kong Country
+> shipped as the single character option. The code remains compiled but can
+> no longer be activated: the menu items are gone, the saved-state re-enable
+> path ignores the persisted setting, and `DKC1_BABY_KONG*` env vars have no
+> effect. This document is kept as the historical record of the mechanism.
+
 Baby Kong is an optional native-host mod that presents Donkey Kong as Kiddy
 Kong and gives him a heavier, Kiddy-inspired movement profile. It is off by
 default and changes neither the supported DKC1 ROM nor any generated source.

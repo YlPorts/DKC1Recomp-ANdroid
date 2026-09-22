@@ -1,5 +1,52 @@
 # Widescreen debug tooling plan
 
+## Native iOS portability check
+
+`tools/verify_ios_simulator.py` runs the existing headless implementation inside
+a diagnostic UIKit app and compares three fresh-boot replays with three desktop
+replays. It records frame, WRAM, VRAM, CGRAM, both OAM and audio hashes plus raw
+evidence. `DKC1_IOS_DIAGNOSTICS` is OFF in device releases; the new UI capture
+overrides are compiled out. `--render-width 418` compares native phone-width
+rendering (default 256). Headless/layer capture accept the bounded, optional
+`DKC1_RENDER_WIDTH` override. The fresh-entry stress tool accepts an explicit
+`--render-width`, keeps its native twin at 256, and grades the matching margin.
+See [iOS commands, tested scenes and incomplete full-game floor](IOS.md)
+and the canonical tool catalog for invocation and save-container isolation.
+The paused `DKC1_IOS_QA_ROLL_Y_B` display probe shows the simultaneous Y/B
+touch contribution; it does not automate or certify physical thumb input.
+`--verify-graphics` runs the existing Metal output/cache oracle inside the
+diagnostic iOS app. `DKC1_IOS_QA_UPSCALER` and
+`DKC1_IOS_QA_UPSCALING_MENU` select a filter and its live-preview sheet for
+paused source-identical screenshots. See the canonical catalog for inputs,
+outputs and the distinction between display probes and physical touch QA.
+
+Optional Dixie verification uses the existing native route runner with
+`contracts/dixie-jungle.json` and `build/dkc1_dixie_headless.exe`; do not run
+its patched cartridge through the stock host or assume that a native pass
+promotes widescreen. `build_host_dixie.bat`, `build_host_dixie_tools.bat`, and
+the opt-in CMake `DKC1_BUILD_DIXIE_VARIANT` SDL sibling are documented in
+[`DIXIE_MOD.md`](DIXIE_MOD.md). Historical failures are recorded in
+[`DIXIE_QA_2026-09-13.md`](DIXIE_QA_2026-09-13.md). The map mapping fix and
+immutable exact-state/fresh-entry evidence are in
+[`DIXIE_MAP_FIX_2026-09-14.md`](DIXIE_MAP_FIX_2026-09-14.md).
+`contracts/dixie-map-refresh.json` requires that report's preserved root via
+`DKC1_SAVESTATE_INPUT`; it verifies normal map reload, resources and navigation
+with three identical native replays. It does not promote widescreen coverage.
+The [v0.0.13 release record](RELEASE_0.0.13.md) adds extracted-package graphics,
+Dixie level-entry and stock cartridge-save/cold-restart verification. The
+canonical catalog documents the allowlisted Windows packager and the optional
+DMA attribution taps included in the pinned engine.
+`contracts/dixie-stomp.json` adds fresh-boot stomp and landing closure.
+The Windows `--haptics-test` uses the actual worker and an SDL virtual device
+to verify pulse/disable/stop without physical motors. See
+[`DIXIE_HAPTICS.md`](DIXIE_HAPTICS.md) for ROM-byte, recorded-frame and UI tests.
+
+Windows v0.0.12 adds `verify_ingame_saves.py` for three-repeat SRAM persistence
+and cold-restart checks. Its isolated user-directory contract, audio comparison
+exclusions and controlled Candy fixture are documented in
+[`INGAME_SAVES.md`](INGAME_SAVES.md) and the canonical tool catalog. Desktop
+debugging now requires private save directories to avoid updating user SRAM.
+
 Windows v0.0.10 exposes the shared SDL host diagnostics and three ROM-free
 CTest targets. See the Windows section of the canonical tool catalog and
 [`WINDOWS_RELEASE.md`](WINDOWS_RELEASE.md). This does not promote a new

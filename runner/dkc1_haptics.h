@@ -16,7 +16,8 @@ typedef struct Dkc1StompProbe {
  * accepted enemy-stomp rebound after the frame completes. */
 void Dkc1StompProbeCapture(Dkc1StompProbe *probe, const uint8_t *wram);
 
-/* Returns true only for the BFA79C enemy-hit rebound. Normal jumps use $0700;
+/* Returns true only for the BFA79C enemy-hit rebound, including the pinned
+ * Dixie variant's $0900 impulse. Normal stock jumps use $0700;
  * contact damage uses a different state/impulse and therefore fails closed. */
 bool Dkc1StompProbeAccepted(const Dkc1StompProbe *probe,
                             const uint8_t *wram);

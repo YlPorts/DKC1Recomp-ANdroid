@@ -6,6 +6,12 @@ pixel aspect, this is 1.78125, within one source pixel of 16:9. The native
 macOS host also offers a symmetric 308x224 mode with 26 pixels per side; its
 1.60417 display aspect is the closest even-width presentation to 16:10.
 
+The iOS frontend also selects a display-matched, even source width inside the
+existing 448-pixel PPU capacity (418×224 on iPhone 16 Pro Max). It keeps SNES
+7:6 pixel proportions and overlays touch controls. This extends the host width
+selection without changing shared calibration/decoder or gameplay policies.
+Mobile validation is limited; see [iOS evidence and remaining gates](IOS.md).
+
 The visible desktop exposes presentation modes under `View -> Aspect Ratio`.
 Windows offers `Native 4:3 (256x224)` and `Widescreen 16:9 (342x224)`; macOS
 also offers `Widescreen 16:10 (308x224)`. Switching modes changes only the

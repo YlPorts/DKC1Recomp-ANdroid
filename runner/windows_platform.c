@@ -68,6 +68,8 @@ static void WriteInt(const wchar_t *section,const char *name,int value){
  ConfigPath();wchar_t key[128],text[32];MultiByteToWideChar(CP_UTF8,0,name,-1,key,128);
  swprintf_s(text,32,L"%d",value);WritePrivateProfileStringW(section,key,text,s_config);
 }
+int Dkc1WindowsSavedHaptics(void){return ReadInt(L"Host","Haptics",1)!=0;}
+void Dkc1WindowsSetHaptics(int enabled){WriteInt(L"Host","Haptics",enabled!=0);}
 static char *ReadPath(const wchar_t *key){
  ConfigPath();wchar_t path[4096];GetPrivateProfileStringW(L"Paths",key,L"",path,4096,s_config);
  if(!path[0])return NULL;char *out=malloc(16384);if(out)WideCharToMultiByte(CP_UTF8,0,path,-1,out,16384,NULL,NULL);return out;
@@ -130,7 +132,8 @@ char *Dkc1MacChooseRom(void){
   free(path);SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,"Unsupported ROM",error,s_sdl);
  }
 }
-char *Dkc1MacChooseBabyKongRom(void){return Pick(L"Choose your DKC3 USA ROM",L"SNES ROM\0*.sfc;*.smc\0All files\0*.*\0");}
+
+
 char *Dkc1MacSavedBabyKongRom(void){return ReadPath(L"DKC3");}
 void Dkc1MacSetBabyKongRom(const char *p){WritePath(L"DKC3",p);}
 int Dkc1MacSavedBabyKongEnabled(void){return ReadInt(L"Mods","BabyKong",0);}
@@ -193,6 +196,8 @@ static HMENU Sub(HMENU parent,const wchar_t *text){HMENU menu=CreatePopupMenu();
 void Dkc1MacInstallMenu(void){
  s_menu=CreateMenu();HMENU game=Sub(s_menu,L"&Game"),view=Sub(s_menu,L"&View"),mods=Sub(s_menu,L"&Mods"),music=Sub(s_menu,L"&Music");
  Add(game,kDkc1MacMenuPauseMenu,L"&Pause / Settings\tEsc");Add(game,kDkc1MacMenuControls,L"&Controls and Assist...");
+ Add(game,kDkc1MacMenuToggleHaptics,L"Controller &rumble (enemy stomps)");
+ Add(game,kDkc1MacMenuTestHaptics,L"&Test controller rumble");
  Add(game,kDkc1MacMenuPause,L"Pause / Resume\tF7");Add(game,kDkc1MacMenuStep,L"Step one frame\tF8");
  Add(game,kDkc1MacMenuQuickSave,L"Quick &Save\tF11");Add(game,kDkc1MacMenuQuickLoad,L"Quick &Load\tF12");Add(game,kDkc1MacMenuExportRepro,L"Export repro bundle\tF9");Add(game,kDkc1MacMenuQuit,L"&Quit\tAlt+F4");
  Add(view,kDkc1MacMenuGraphics,L"&Graphics Settings...");Add(view,kDkc1MacMenuFullscreen,L"&Fullscreen\tAlt+Enter");
@@ -202,21 +207,35 @@ void Dkc1MacInstallMenu(void){
  HMENU colors=Sub(view,L"Phosphor &colors");const wchar_t *colorNames[]={L"Raw",L"CRT",L"Composite",L"Trinitron"};for(int i=0;i<4;i++)Add(colors,kDkc1MacMenuScreenRaw+i,colorNames[i]);
  HMENU edges=Sub(view,L"Level &edge");const wchar_t *edgeNames[]={L"Reflect",L"Black bars",L"Shift",L"Glide"};for(int i=0;i<4;i++)Add(edges,kDkc1MacMenuEdgeReflect+i,edgeNames[i]);
  HMENU layers=Sub(view,L"&Layers");const wchar_t *layerNames[]={L"Composite",L"BG1",L"BG2",L"BG3",L"Sprites"};for(int i=0;i<5;i++)Add(layers,kDkc1MacMenuLayerComposite+i,layerNames[i]);Add(view,kDkc1MacMenuProvenance,L"Provenance\tF1");
- Add(mods,kDkc1MacMenuToggleBabyKong,L"&Baby Kong");Add(mods,kDkc1MacMenuChooseBabyKongRom,L"Choose &DKC3 ROM...");
+ Add(mods,kDkc1MacMenuToggleDixie,L"&Dixie Kong Country");
  Add(music,kDkc1MacMenuChooseMusicPack,L"Choose &MSU-1 music pack...");Add(music,kDkc1MacMenuDisableMusicPack,L"&Disable replacement music");
  ThemeMenu(s_menu,1);SetMenu(s_window,s_menu);DrawMenuBar(s_window);
 }
 static void Check(int id,int checked){CheckMenuItem(s_menu,id,MF_BYCOMMAND|(checked?MF_CHECKED:MF_UNCHECKED));}
+void Dkc1WindowsUpdateHapticsMenu(int enabled){
+ if(!s_menu)return;
+ Check(kDkc1MacMenuToggleHaptics,enabled);
+ EnableMenuItem(s_menu,kDkc1MacMenuTestHaptics,MF_BYCOMMAND|(enabled?MF_ENABLED:MF_GRAYED));
+}
 void Dkc1MacUpdateGraphicsMenuState(int display,int upscaler,int screen){
  Check(kDkc1MacMenuDisplayFlat,!display);Check(kDkc1MacMenuDisplayCrt,display);
  int scalers[]={kDkc1MacMenuFullscreenPixelSharp,kDkc1MacMenuFullscreenSmooth,kDkc1MacMenuUpscalerReconstruct,kDkc1MacMenuFullscreenSharpBilinear};
  for(int i=0;i<4;i++){Check(scalers[i],i==upscaler);Check(kDkc1MacMenuScreenRaw+i,i==screen);}
 }
-void Dkc1MacUpdateMenuState(int paused,int fullscreen,Dkc1MacFullscreenScaling scaling,Dkc1VideoAspect aspect,Dkc1EdgePolicy edge,unsigned char layers,int provenance,int music,int baby,int ready){
- (void)scaling;(void)ready;Check(kDkc1MacMenuPause,paused);Check(kDkc1MacMenuFullscreen,fullscreen);Check(kDkc1MacMenuToggleBabyKong,baby);Check(kDkc1MacMenuChooseMusicPack,music);Check(kDkc1MacMenuProvenance,provenance);
+void Dkc1MacUpdateMenuState(int paused,int fullscreen,Dkc1MacFullscreenScaling scaling,Dkc1VideoAspect aspect,Dkc1EdgePolicy edge,unsigned char layers,int provenance,int music,int baby,int ready,int dixie){
+ (void)scaling;(void)ready;Check(kDkc1MacMenuPause,paused);Check(kDkc1MacMenuFullscreen,fullscreen);(void)baby;Check(kDkc1MacMenuChooseMusicPack,music);Check(kDkc1MacMenuProvenance,provenance);Check(kDkc1MacMenuToggleDixie,dixie);
  for(int i=0;i<3;i++)Check(kDkc1MacMenuAspectNative+i,aspect==i);for(int i=0;i<4;i++)Check(kDkc1MacMenuEdgeReflect+i,edge==i);
  int masks[]={255,1,2,4,16};for(int i=0;i<5;i++)Check(kDkc1MacMenuLayerComposite+i,layers==masks[i]);
 }
+/* A Win32 menu bar is non-client area and stays drawn on the borderless
+ * fullscreen popup SDL creates, so it is detached for fullscreen and restored
+ * afterward. The HMENU and its checkmarks survive detachment. */
+void Dkc1WindowsShowMenuBar(int visible){
+ if(!s_window||!s_menu)return;
+ if(!!visible==(GetMenu(s_window)!=NULL))return;
+ SetMenu(s_window,visible?s_menu:NULL);DrawMenuBar(s_window);
+}
+int Dkc1WindowsMenuBarVisible(void){return s_window&&GetMenu(s_window)!=NULL;}
 void Dkc1WindowsEvent(const SDL_Event *event){(void)event;if(s_pending){int command=s_pending;s_pending=0;Dkc1MacMenuCommand(command);}}
 void Dkc1WindowsDetach(void){if(s_window){RemoveWindowSubclass(s_window,WindowProc,1);SetMenu(s_window,NULL);}if(s_menu)DestroyMenu(s_menu);if(s_font)DeleteObject(s_font);if(s_dark)DeleteObject(s_dark);s_window=NULL;s_menu=NULL;s_item_count=0;CoUninitialize();}
 
@@ -252,9 +271,8 @@ static void FillPanel(void){
   const char *names[]={"Rewind","Fast-forward (3x)","Quick Save","Quick Load"};for(int i=0;i<4;i++){int y=125+i*55;Child("STATIC",names[i],0,22,y+5,190,25,0);Binding(3310+i,215,y,275,0,s_controls->assist_keys[i]);Binding(3320+i,505,y,290,1,s_controls->assist_pads[i]);}
   Child("STATIC","Rewind uses at most 128 MiB. Save and load use the slot selected in Settings.",0,22,370,780,40,0);
  }else if(s_page==6){
-  Child("BUTTON","Choose DKC3 ROM / enable Baby Kong",3400,22,75,510,38,BS_PUSHBUTTON);Child("BUTTON","Toggle Baby Kong",3401,22,125,510,38,BS_PUSHBUTTON);
   Child("BUTTON","Choose MSU-1 music folder or archive",3402,22,200,510,38,BS_PUSHBUTTON);Child("BUTTON","Disable replacement music",3403,22,250,510,38,BS_PUSHBUTTON);
-  Child("STATIC","Baby Kong requires your own DKC3 ROM. Music selection applies after restart.",0,22,320,780,60,0);
+  Child("STATIC","Music selection applies after restart. Dixie Kong Country lives in the Mods menu and needs no extra ROM.",0,22,320,780,60,0);
  }else Child("STATIC","DKC1Recomp\nOriginal game: Rare / Nintendo\nNative host and tools: project contributors\nSNESrecomp and SDL contributors\n\nNo ROM or game assets are included.",0,22,80,770,280,0);
  InvalidateRect(s_panel,NULL,TRUE);
 }
@@ -292,7 +310,7 @@ static LRESULT CALLBACK PanelProc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp){
   if(id==1100||id==1101){s_resume=id==1100;DestroyWindow(hwnd);s_panel=NULL;return 0;}
   if(id==1202){Dkc1MacMenuCommand(kDkc1MacMenuQuit);DestroyWindow(hwnd);s_panel=NULL;return 0;}
   if(id==1200||id==1201){Dkc1MacMenuCommand(id==1200?kDkc1MacMenuQuickSave:kDkc1MacMenuQuickLoad);FillPanel();return 0;}
-  if(id>=3400&&id<=3403){int commands[]={kDkc1MacMenuChooseBabyKongRom,kDkc1MacMenuToggleBabyKong,kDkc1MacMenuChooseMusicPack,kDkc1MacMenuDisableMusicPack};Dkc1MacMenuCommand(commands[id-3400]);return 0;}
+  if(id>=3402&&id<=3403){int commands[]={kDkc1MacMenuChooseMusicPack,kDkc1MacMenuDisableMusicPack};Dkc1MacMenuCommand(commands[id-3402]);return 0;}
   if(HIWORD(wp)==CBN_SELCHANGE){int index=(int)SendMessageW((HWND)lp,CB_GETCURSEL,0,0);int v=(int)SendMessageW((HWND)lp,CB_GETITEMDATA,index,0);
    if(id>=2000&&id<2000+(int)(sizeof fields/sizeof *fields)){
     const Field *f=&fields[id-2000];*(int*)((char*)s_graphics+f->offset)=v;
@@ -354,6 +372,13 @@ int Dkc1WindowsPlatformTest(const char *directory){
  SDL_Window *window=SDL_CreateWindow("Synthetic menu test",0,0,400,300,SDL_WINDOW_HIDDEN);
  if(!window)return 5;Dkc1WindowsAttach(window);Dkc1MacInstallMenu();
  if(GetMenuItemCount(s_menu)!=4)return 6;
+ if(!Dkc1WindowsSavedHaptics())return 15;
+ for(int enabled=0;enabled<2;enabled++){
+  Dkc1WindowsSetHaptics(enabled);if(Dkc1WindowsSavedHaptics()!=enabled)return 16;
+  Dkc1WindowsUpdateHapticsMenu(enabled);
+  if(!!(GetMenuState(s_menu,kDkc1MacMenuToggleHaptics,MF_BYCOMMAND)&MF_CHECKED)!=enabled)return 17;
+  if(!!(GetMenuState(s_menu,kDkc1MacMenuTestHaptics,MF_BYCOMMAND)&MF_GRAYED)==enabled)return 18;
+ }
  const int scalers[]={kDkc1MacMenuFullscreenPixelSharp,kDkc1MacMenuFullscreenSmooth,kDkc1MacMenuUpscalerReconstruct,kDkc1MacMenuFullscreenSharpBilinear};
  for(int selected=0;selected<4;selected++){
   Dkc1MacUpdateGraphicsMenuState(selected&1,selected,selected);
@@ -361,11 +386,18 @@ int Dkc1WindowsPlatformTest(const char *directory){
   if(!(GetMenuState(s_menu,kDkc1MacMenuScreenRaw+selected,MF_BYCOMMAND)&MF_CHECKED))return 8;
  }
  for(int selected=0;selected<3;selected++){
-  Dkc1MacUpdateMenuState(0,0,1,selected,3,255,0,0,0,0);
+  Dkc1MacUpdateMenuState(0,0,1,selected,3,255,0,0,0,0,selected&1);
   for(int i=0;i<3;i++)if(!!(GetMenuState(s_menu,kDkc1MacMenuAspectNative+i,MF_BYCOMMAND)&MF_CHECKED)!=(i==selected))return 9;
+  if(!!(GetMenuState(s_menu,kDkc1MacMenuToggleDixie,MF_BYCOMMAND)&MF_CHECKED)!=(selected&1))return 14;
  }
+ /* Fullscreen must detach the bar without losing the menu or its state. */
+ if(!Dkc1WindowsMenuBarVisible())return 10;
+ Dkc1WindowsShowMenuBar(0);if(Dkc1WindowsMenuBarVisible()||GetMenu(s_window))return 11;
+ Dkc1MacUpdateMenuState(0,1,1,2,3,255,0,0,0,0,0);
+ Dkc1WindowsShowMenuBar(1);if(!Dkc1WindowsMenuBarVisible()||GetMenu(s_window)!=s_menu)return 12;
+ if(!(GetMenuState(s_menu,kDkc1MacMenuFullscreen,MF_BYCOMMAND)&MF_CHECKED)||!(GetMenuState(s_menu,kDkc1MacMenuAspect16x9,MF_BYCOMMAND)&MF_CHECKED))return 13;
  Dkc1WindowsDetach();SDL_DestroyWindow(window);
- puts("WINDOWS_PLATFORM_PASS: 23 graphics fields at min/mid/max, controls roundtrip, four dark menus, scaler/color/aspect checkmarks");return 0;
+ puts("WINDOWS_PLATFORM_PASS: 23 graphics fields at min/mid/max, controls roundtrip, four dark menus, scaler/color/aspect checkmarks, fullscreen menu bar detach/restore");return 0;
 }
 
 /* Mac display-link entry points are not selected on Windows. */
