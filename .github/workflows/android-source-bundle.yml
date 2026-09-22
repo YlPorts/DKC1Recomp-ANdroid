@@ -1,0 +1,53 @@
+name: Android public source bundle
+
+on:
+  push:
+    branches: [ android-upstream-014 ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Fetch pinned SDL2 source
+        run: |
+          mkdir -p android-public/third_party
+          git clone --filter=blob:none --no-checkout https://github.com/libsdl-org/SDL.git android-public/third_party/SDL2
+          git -C android-public/third_party/SDL2 checkout c98c4fbff6d8f3016a3ce6685bf8f43433c3efcc
+
+      - name: Expand Android source layer
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(Path("ports/android/v1.6/android-port-src.zip")) as z:
+              z.extractall("android-public")
+          PY
+          cp ports/android/v1.6/upstream014/app/build.gradle android-public/android/app/build.gradle
+          cp ports/android/v1.6/upstream014/app/src/main/AndroidManifest.xml android-public/android/app/src/main/AndroidManifest.xml
+          cp ports/android/v1.6/upstream014/app/src/main/java/com/ylports/dkc1recomp/*.java android-public/android/app/src/main/java/com/ylports/dkc1recomp/
+          cp ports/android/v1.6/upstream014/native/android_host.c android-public/android/native/android_host.c
+          cp ports/android/v1.6/upstream014/tests/*.java android-public/android/tests/
+
+      - name: Package public source inputs
+        run: |
+          mkdir -p android-public/project
+          cp -a CMakeLists.txt runner recomp scripts tests tools LICENSE THIRD_PARTY_NOTICES.md android-public/project/
+          cp -a snesrecomp android-public/project/snesrecomp
+          python3 - <<'PY'
+          import shutil
+          shutil.make_archive("dkc1-android-public-source", "zip", "android-public")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-android-public-source
+          path: dkc1-android-public-source.zip
+          if-no-files-found: error
