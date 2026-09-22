@@ -26,8 +26,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-5040-81f5-bb94-6b472162f1e3/raw?se=2026-09-22T02%3A57%3A46Z&sp=r&sv=2026-02-06&sr=b&scid=478f4965-ddd9-51df-81cb-0b2fca9f002e&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-21T23%3A24%3A07Z&ske=2026-09-22T23%3A24%3A07Z&sks=b&skv=2026-02-06&sig=yLbHIJ5rqxOidllCIXmnxBi/7pHY9oe6Uttsq%2BsHE/o%3D' -o /tmp/android-overlay.tar.xz
-          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-bdc4-81f5-bf39-8938192b7235/raw?se=2026-09-22T02%3A58%3A15Z&sp=r&sv=2026-02-06&sr=b&scid=a2efec8e-a82d-5065-9b0a-7af7686f47db&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-21T23%3A32%3A15Z&ske=2026-09-22T23%3A32%3A15Z&sks=b&skv=2026-02-06&sig=%2BoUNwtUbFmNtowpcPtFYu6jh6fQ46p35tINK/HfLmTI%3D' -o /tmp/generated.tar.xz
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-c6ec-81f5-be85-d4b030d56191/raw?se=2026-09-22T02%3A59%3A09Z&sp=r&sv=2026-02-06&sr=b&scid=8ca29f43-28f9-551d-8c16-184ede469a5a&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-21T23%3A31%3A48Z&ske=2026-09-22T23%3A31%3A48Z&sks=b&skv=2026-02-06&sig=5Ov%2ByjC%2BuuuVONuNyNqjLCe6SiqDhXCDq9AxOq6bEVc%3D' -o /tmp/android-overlay.tar.xz
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-1878-81f5-a641-d2f295143a01/raw?se=2026-09-22T02%3A59%3A36Z&sp=r&sv=2026-02-06&sr=b&scid=fcec76ec-40c6-5c09-803c-f896997e20d7&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-22T01%3A09%3A21Z&ske=2026-09-23T01%3A09%3A21Z&sks=b&skv=2026-02-06&sig=rM8EDGtmomHSnobAJQHgY/dCb/82z7YF68MVV%2B4aSCA%3D' -o /tmp/generated.tar.xz
           echo '4a9fcbd1d864ef24de1213b3d4e77cfc39a2e9b04bb7cd9d8ba8eed3f8ad3141  /tmp/android-overlay.tar.xz' | sha256sum -c -
           echo '5e42ca04149ea60e9f6832f1c2cdb1c3a5f39d5f50da2789dee96b20ebe46c03  /tmp/generated.tar.xz' | sha256sum -c -
           tar -xJf /tmp/android-overlay.tar.xz
@@ -68,20 +68,27 @@ jobs:
           java-version: '17'
 
       - name: Configure Android SDK
+        id: sdk
         shell: bash
         run: |
           set -euo pipefail
-          echo "$ANDROID_HOME/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -perm -u+x 2>/dev/null | sort -V | tail -n1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under $ANDROID_HOME/cmdline-tools" >&2
+            find "$ANDROID_HOME" -maxdepth 4 -type f -name sdkmanager -print >&2 || true
+            exit 1
+          fi
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-          test -x "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
-          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --version
+          "$SDKMANAGER" --version
 
       - name: Install pinned Android toolchain
         shell: bash
         run: |
           set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'cmake;3.22.1' 'ndk;28.2.13676358'
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'cmake;3.22.1' 'ndk;28.2.13676358'
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
 
       - name: Build and lint release APK
