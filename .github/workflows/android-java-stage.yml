@@ -1,0 +1,81 @@
+name: Android Java stage
+
+on:
+  push:
+    branches: [ android-upstream-014 ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  java-stage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Expand audited Android source layer
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          archive=Path("ports/android/v1.6/android-port-src.zip")
+          with zipfile.ZipFile(archive) as z:
+              z.extractall(".")
+          PY
+
+      - name: Apply Android 0.0.14 Java overrides
+        run: |
+          cp ports/android/v1.6/upstream014/app/build.gradle android/app/build.gradle
+          cp ports/android/v1.6/upstream014/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          cp ports/android/v1.6/upstream014/app/src/main/java/com/ylports/dkc1recomp/*.java android/app/src/main/java/com/ylports/dkc1recomp/
+
+      - name: Fetch pinned SDL2 Java frontend
+        run: |
+          mkdir -p android/third_party
+          git init android/third_party/SDL2
+          git -C android/third_party/SDL2 remote add origin https://github.com/libsdl-org/SDL.git
+          git -C android/third_party/SDL2 fetch --depth 1 origin c98c4fbff6d8f3016a3ce6685bf8f43433c3efcc
+          git -C android/third_party/SDL2 checkout --detach FETCH_HEAD
+
+      - name: Disable native build for Java/Dex validation stage
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/build.gradle")
+          s=p.read_text()
+          s=s.replace("    ndkVersion '28.2.13676358'\n","")
+          s=s.replace("        ndk { abiFilters 'arm64-v8a' }\n","")
+          s=s.replace("        externalNativeBuild {\n            cmake { arguments '-DANDROID_STL=c++_static'; targets 'main', 'SDL2' }\n        }\n","")
+          s=s.replace("    externalNativeBuild { cmake { path file('../native/CMakeLists.txt'); version '3.22.1' } }\n","")
+          p.write_text(s)
+          PY
+
+      - name: Java model regressions
+        run: |
+          mkdir -p android/.java-tests
+          javac -d android/.java-tests             android/app/src/main/java/com/ylports/dkc1recomp/PadModel.java             android/app/src/main/java/com/ylports/dkc1recomp/RenderWidth.java             android/app/src/main/java/com/ylports/dkc1recomp/RomVerifier.java             ports/android/v1.6/upstream014/tests/PortTests.java
+          java -cp android/.java-tests com.ylports.dkc1recomp.PortTests
+          rm -rf android/.java-tests
+          mkdir -p android/.java-tests
+          javac -d android/.java-tests             android/app/src/main/java/com/ylports/dkc1recomp/MusicPack.java             ports/android/v1.6/upstream014/tests/MsuImportRegressionTest.java
+          java -cp android/.java-tests com.ylports.dkc1recomp.MsuImportRegressionTest
+
+      - name: Build Java/resources APK
+        working-directory: android
+        run: python3 tools/gradle_runner.py --no-daemon :app:assembleDebug
+
+      - name: Verify Dex exists and native payload is intentionally absent
+        run: |
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | tee /tmp/apk-list.txt
+          grep -q 'classes.dex' /tmp/apk-list.txt
+          if grep -q 'lib/arm64-v8a/libmain.so' /tmp/apk-list.txt; then
+            echo "Unexpected native payload in Java stage" >&2
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-android-java-stage
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
