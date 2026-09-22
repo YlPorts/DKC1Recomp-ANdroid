@@ -12,6 +12,9 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout DKC1 fork
         uses: actions/checkout@v4
@@ -23,8 +26,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-c818-81f5-a197-503458c005ea/raw?se=2026-09-22T02%3A55%3A35Z&sp=r&sv=2026-02-06&sr=b&scid=9f51bcd3-8908-5f50-b933-ffd9e6fc5396&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-22T01%3A56%3A16Z&ske=2026-09-23T01%3A56%3A16Z&sks=b&skv=2026-02-06&sig=1gJyrCwqVCLfHqMKv%2BBksebtGYqHSWrXOBP91ucTWHk%3D' -o /tmp/android-overlay.tar.xz
-          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-8b78-81f5-a3f9-e9d9e81b901b/raw?se=2026-09-22T02%3A56%3A03Z&sp=r&sv=2026-02-06&sr=b&scid=e248815c-59da-58c4-a2ac-eb756c199549&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-21T23%3A21%3A57Z&ske=2026-09-22T23%3A21%3A57Z&sks=b&skv=2026-02-06&sig=B32oSos6kAQMNNKT%2BTP7e8BydwCnZnuC/n0XrMdoiCA%3D' -o /tmp/generated.tar.xz
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-5040-81f5-bb94-6b472162f1e3/raw?se=2026-09-22T02%3A57%3A46Z&sp=r&sv=2026-02-06&sr=b&scid=478f4965-ddd9-51df-81cb-0b2fca9f002e&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-21T23%3A24%3A07Z&ske=2026-09-22T23%3A24%3A07Z&sks=b&skv=2026-02-06&sig=yLbHIJ5rqxOidllCIXmnxBi/7pHY9oe6Uttsq%2BsHE/o%3D' -o /tmp/android-overlay.tar.xz
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-bdc4-81f5-bf39-8938192b7235/raw?se=2026-09-22T02%3A58%3A15Z&sp=r&sv=2026-02-06&sr=b&scid=a2efec8e-a82d-5065-9b0a-7af7686f47db&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-21T23%3A32%3A15Z&ske=2026-09-22T23%3A32%3A15Z&sks=b&skv=2026-02-06&sig=%2BoUNwtUbFmNtowpcPtFYu6jh6fQ46p35tINK/HfLmTI%3D' -o /tmp/generated.tar.xz
           echo '4a9fcbd1d864ef24de1213b3d4e77cfc39a2e9b04bb7cd9d8ba8eed3f8ad3141  /tmp/android-overlay.tar.xz' | sha256sum -c -
           echo '5e42ca04149ea60e9f6832f1c2cdb1c3a5f39d5f50da2789dee96b20ebe46c03  /tmp/generated.tar.xz' | sha256sum -c -
           tar -xJf /tmp/android-overlay.tar.xz
@@ -64,15 +67,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Configure Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$ANDROID_HOME/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          test -x "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
+          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --version
 
       - name: Install pinned Android toolchain
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'cmake;3.22.1' 'ndk;28.2.13676358'
+          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'cmake;3.22.1' 'ndk;28.2.13676358'
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
 
       - name: Build and lint release APK
@@ -86,13 +95,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ci-output/build-tools/lib ci-output/build-tools/lib64
+          mkdir -p ci-output/build-tools
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk ci-output/DKC1-Android-v1.6-upstream014-unsigned.apk
-          cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" ci-output/build-tools/
-          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" ci-output/build-tools/
-          cp "$ANDROID_HOME/build-tools/35.0.0/aapt" ci-output/build-tools/
-          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" ci-output/build-tools/lib/
-          if [ -d "$ANDROID_HOME/build-tools/35.0.0/lib64" ]; then cp -a "$ANDROID_HOME/build-tools/35.0.0/lib64/." ci-output/build-tools/lib64/; fi
+          cp -a "$ANDROID_HOME/build-tools/35.0.0/." ci-output/build-tools/
           sha256sum ci-output/DKC1-Android-v1.6-upstream014-unsigned.apk > ci-output/SHA256SUMS.txt
 
       - name: Upload unsigned release
