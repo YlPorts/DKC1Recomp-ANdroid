@@ -40,7 +40,7 @@ jobs:
           ! grep -q 'Dkc1AndroidAudioNoteApuCommand' android/native/mod_hooks.c
           ! grep -q 'Disponible desde la pausa del juego' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
           ! grep -q 'Formato de imagen · requiere volver al juego' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
-          grep -q 'Ui.card(c,"Volumen"' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
+          grep -q 'card("Volumen",null)' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
 
       - name: Prepare pinned snesrecomp
         shell: bash
