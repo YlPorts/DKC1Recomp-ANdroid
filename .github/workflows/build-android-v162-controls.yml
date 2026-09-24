@@ -26,15 +26,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 'https://sdmntprindiasocentral.oaiusercontent.com/files/00000000-b448-8211-86e0-fd1e2b16f08d/raw?se=2026-09-24T17%3A46%3A58Z&sp=r&sv=2026-02-06&sr=b&scid=3689dd34-8515-5278-bf28-58da9808e3aa&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T16%3A38%3A30Z&ske=2026-09-25T16%3A38%3A30Z&sks=b&skv=2026-02-06&sig=nbXaljJQlcY5FqZRhjbjUOWwyA1NvSSHZzj/01tP/KI%3D' -o /tmp/android-overlay.tar.xz
-          curl --fail --location --retry 3 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-5224-820e-8d2b-ad6b5abcddbc/raw?se=2026-09-24T17%3A47%3A28Z&sp=r&sv=2026-02-06&sr=b&scid=772f5789-1717-5b9d-a725-8265d8867494&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T17%3A16%3A51Z&ske=2026-09-25T17%3A16%3A51Z&sks=b&skv=2026-02-06&sig=n58I2SmFYdwdIia0tZigsZx1t/SL4SllE22hCXCIbqk%3D' -o /tmp/generated.tar.xz
-          echo '331b3013ef1cd29b2797bfc944338246dfb19c501b8a63d6d39ca6e8543bc150  /tmp/android-overlay.tar.xz' | sha256sum -c -
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-7488-81f5-8b7b-7ef06e7d17b2/raw?se=2026-09-24T17%3A53%3A07Z&sp=r&sv=2026-02-06&sr=b&scid=79ee4c15-95cf-5138-a890-7a526b05911e&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T16%3A58%3A00Z&ske=2026-09-25T16%3A58%3A00Z&sks=b&skv=2026-02-06&sig=LZEqn1t3e8OZ9uA87OEAzexRRPoyWmZhMumFM6kjG38%3D' -o /tmp/android-overlay.tar.xz
+          curl --fail --location --retry 3 'https://sdmntpritalynorth.oaiusercontent.com/files/00000000-ebec-8246-b969-71629a3b14d4/raw?se=2026-09-24T17%3A53%3A37Z&sp=r&sv=2026-02-06&sr=b&scid=dbe2d73a-1d0d-5ce8-af88-bcfa75e2b4cc&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T16%3A24%3A24Z&ske=2026-09-25T16%3A24%3A24Z&sks=b&skv=2026-02-06&sig=ZUm1%2BAoYAPjJKuyyZ4/BFZTI9V/dA4eexksd/Ulbl2A%3D' -o /tmp/generated.tar.xz
+          echo 'bef3eb073fa24896686109ca2844e860c4123cffc6659f5cb271b41820ab9bcf  /tmp/android-overlay.tar.xz' | sha256sum -c -
           echo 'd98260e2b0529ad1cecc56fd067bba57eb45339e6db8c1b8e60362b274a300e1  /tmp/generated.tar.xz' | sha256sum -c -
           tar -xJf /tmp/android-overlay.tar.xz
           tar -xJf /tmp/generated.tar.xz
           grep -q "versionCode 112" android/app/build.gradle
           grep -q "versionName '1.6.2'" android/app/build.gradle
-          grep -q 'BuildConfig.VERSION_NAME' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
+          grep -q 'v1.6.2' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
           grep -q "Mostrar botón de rebobinado" android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
           ! grep -q 'Licencias' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
           ! grep -q 'Asistencia' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
