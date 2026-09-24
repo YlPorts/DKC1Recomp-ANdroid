@@ -52,7 +52,158 @@ jobs:
           git -C snesrecomp apply ../android/engine-patches/compat-v1.patch
           git -C snesrecomp apply ../android/engine-patches/native-module-v1.patch
           git apply android/engine-patches/native-module-host-v1.patch
-          git -C snesrecomp apply ../android/engine-patches/audio-split-v1.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          h=Path("snesrecomp/runner/src/snes/dsp.h")
+          c=Path("snesrecomp/runner/src/snes/dsp.c")
+          hs=h.read_text()
+          cs=c.read_text()
+
+          def once(text, old, new, label):
+              if text.count(old) != 1:
+                  raise SystemExit(f"{label}: expected one match, got {text.count(old)}")
+              return text.replace(old, new, 1)
+
+          hs=once(hs,
+          """  // void* to keep dsp.h free of the shadow header; dsp.c owns the type.
+            void *shadow;
+            // mirror ram
+          """,
+          """  // void* to keep dsp.h free of the shadow header; dsp.c owns the type.
+            void *shadow;
+            // Host-only DKC1 mixer split. These fields deliberately stay before `ram`
+            // so the serialized DSP region and existing save-state ABI are unchanged.
+            uint8_t hostSfxVoiceMask;
+            uint8_t hostPendingSfxCommands;
+            uint16_t hostSfxCommandTtl;
+            uint8_t hostMusicGain;
+            uint8_t hostEffectsGain;
+            uint16_t hostAudioReserved;
+            // mirror ram
+          ""","dsp.h fields")
+
+          hs=once(hs,
+          """void dsp_write(Dsp* dsp, uint8_t adr, uint8_t val);
+          /* Native-rate output-ring access.""",
+          """void dsp_write(Dsp* dsp, uint8_t adr, uint8_t val);
+          void dsp_audio_split_set_gains(Dsp* dsp, int music_percent, int effects_percent);
+          void dsp_audio_split_note_sfx_command(Dsp* dsp);
+          void dsp_audio_split_reset(Dsp* dsp);
+          /* Native-rate output-ring access.""","dsp.h api")
+
+          cs=once(cs,
+          """void dsp_reset(Dsp* dsp) {
+            memset(dsp->ram, 0, sizeof(dsp->ram));""",
+          """void dsp_reset(Dsp* dsp) {
+            dsp->hostSfxVoiceMask = 0;
+            dsp->hostPendingSfxCommands = 0;
+            dsp->hostSfxCommandTtl = 0;
+            dsp->hostMusicGain = 100;
+            dsp->hostEffectsGain = 100;
+            memset(dsp->ram, 0, sizeof(dsp->ram));""","dsp reset")
+
+          cs=once(cs,
+          """void dsp_saveload(Dsp *dsp, SaveLoadInfo *sli) {
+            sli->func(sli, &dsp->ram, sizeof(Dsp) - offsetof(Dsp, ram));
+          }
+
+          void dsp_cycle(Dsp* dsp) {
+            int totalL = 0;""",
+          """void dsp_saveload(Dsp *dsp, SaveLoadInfo *sli) {
+            sli->func(sli, &dsp->ram, sizeof(Dsp) - offsetof(Dsp, ram));
+          }
+
+          static int dsp_clamp_percent(int value) {
+            return value < 0 ? 0 : value > 100 ? 100 : value;
+          }
+
+          void dsp_audio_split_set_gains(Dsp* dsp, int music_percent, int effects_percent) {
+            if (!dsp) return;
+            dsp->hostMusicGain = (uint8_t)dsp_clamp_percent(music_percent);
+            dsp->hostEffectsGain = (uint8_t)dsp_clamp_percent(effects_percent);
+          }
+
+          void dsp_audio_split_note_sfx_command(Dsp* dsp) {
+            if (!dsp) return;
+            if (dsp->hostPendingSfxCommands != 0xff)
+              dsp->hostPendingSfxCommands++;
+            dsp->hostSfxCommandTtl = 2048;
+          }
+
+          void dsp_audio_split_reset(Dsp* dsp) {
+            if (!dsp) return;
+            dsp->hostSfxVoiceMask = 0;
+            dsp->hostPendingSfxCommands = 0;
+            dsp->hostSfxCommandTtl = 0;
+          }
+
+          static int dsp_host_voice_gain(const Dsp* dsp, int ch) {
+            return (dsp->hostSfxVoiceMask & (1u << ch)) ?
+                dsp->hostEffectsGain : dsp->hostMusicGain;
+          }
+
+          void dsp_cycle(Dsp* dsp) {
+            if (dsp->hostSfxCommandTtl && --dsp->hostSfxCommandTtl == 0)
+              dsp->hostPendingSfxCommands = 0;
+            int totalL = 0;""","dsp helpers")
+
+          cs=once(cs,
+          """    dsp_cycleChannel(dsp, i);
+              totalL += (dsp->channel[i].sampleOut * dsp->channel[i].volumeL) >> 6;
+              totalR += (dsp->channel[i].sampleOut * dsp->channel[i].volumeR) >> 6;
+              totalL = totalL < -0x8000 ? -0x8000 : (totalL > 0x7fff ? 0x7fff : totalL); // clamp 16-bit""",
+          """    dsp_cycleChannel(dsp, i);
+              const int host_gain = dsp_host_voice_gain(dsp, i);
+              int voiceL = (dsp->channel[i].sampleOut * dsp->channel[i].volumeL) >> 6;
+              int voiceR = (dsp->channel[i].sampleOut * dsp->channel[i].volumeR) >> 6;
+              voiceL = (voiceL * host_gain) / 100;
+              voiceR = (voiceR * host_gain) / 100;
+              totalL += voiceL;
+              totalR += voiceR;
+              totalL = totalL < -0x8000 ? -0x8000 : (totalL > 0x7fff ? 0x7fff : totalL); // clamp 16-bit""","dry mix")
+
+          cs=once(cs,
+          """  if (dsp->shadow) {
+              int sL = totalL, sR = totalR;""",
+          """  if (dsp->shadow && dsp->hostMusicGain == 100 &&
+              dsp->hostEffectsGain == 100) {
+              int sL = totalL, sR = totalR;""","shadow")
+
+          cs=once(cs,
+          """    if(dsp->channel[i].echoEnable) {
+                inL += (dsp->channel[i].sampleOut * dsp->channel[i].volumeL) >> 6;
+                inR += (dsp->channel[i].sampleOut * dsp->channel[i].volumeR) >> 6;""",
+          """    if(dsp->channel[i].echoEnable) {
+                const int host_gain = dsp_host_voice_gain(dsp, i);
+                int voiceL = (dsp->channel[i].sampleOut * dsp->channel[i].volumeL) >> 6;
+                int voiceR = (dsp->channel[i].sampleOut * dsp->channel[i].volumeR) >> 6;
+                inL += (voiceL * host_gain) / 100;
+                inR += (voiceR * host_gain) / 100;""","echo mix")
+
+          cs=once(cs,
+          """    case 0x4c: {
+                // Latch only; the per-channel poll in dsp_cycleChannel applies
+                // KON every other sample with KOF priority (hardware behavior).
+                for(int ch = 0; ch < 8; ch++) {""",
+          """    case 0x4c: {
+                // Latch only; the per-channel poll in dsp_cycleChannel applies
+                // KON every other sample with KOF priority (hardware behavior).
+                if (val) {
+                  if (dsp->hostPendingSfxCommands && dsp->hostSfxCommandTtl) {
+                    dsp->hostSfxVoiceMask |= val;
+                    dsp->hostPendingSfxCommands--;
+                    if (!dsp->hostPendingSfxCommands)
+                      dsp->hostSfxCommandTtl = 0;
+                  } else {
+                    dsp->hostSfxVoiceMask &= (uint8_t)~val;
+                  }
+                }
+                for(int ch = 0; ch < 8; ch++) {""","KON classifier")
+
+          h.write_text(hs)
+          c.write_text(cs)
+          PY
           grep -q 'dsp_audio_split_set_gains' snesrecomp/runner/src/snes/dsp.h
           grep -q 'hostSfxVoiceMask' snesrecomp/runner/src/snes/dsp.c
 
