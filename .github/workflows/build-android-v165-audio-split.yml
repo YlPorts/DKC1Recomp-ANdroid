@@ -26,9 +26,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-4a40-81f4-8aee-bc992f9ff15a/raw?se=2026-09-24T19%3A38%3A45Z&sp=r&sv=2026-02-06&sr=b&scid=3a29c9aa-ce8d-5740-a4c2-7fe4a7bb33fb&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T18%3A43%3A05Z&ske=2026-09-25T18%3A43%3A05Z&sks=b&skv=2026-02-06&sig=o/6jgvnsh/XFNbQ6tmaKFi6K1OckROLLVJRGZMHddzk%3D' -o /tmp/android-overlay.tar.xz
+          curl --fail --location --retry 3 'https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-b53c-81fb-a0ec-299c5bc9a44c/raw?se=2026-09-24T19%3A40%3A41Z&sp=r&sv=2026-02-06&sr=b&scid=4e0ef719-eb23-5fe4-b51e-5f1644f4508a&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T18%3A45%3A21Z&ske=2026-09-25T18%3A45%3A21Z&sks=b&skv=2026-02-06&sig=ORa5m1ajKtggNtteBA6Xnekhc%2B3PqBk/imyof9953Wk%3D' -o /tmp/android-overlay.tar.xz
           curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-aa3c-81f5-88a5-ba715ed027c7/raw?se=2026-09-24T19%3A39%3A12Z&sp=r&sv=2026-02-06&sr=b&scid=c73ab707-a434-5195-bfe0-58cf6914e0d0&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T19%3A14%3A11Z&ske=2026-09-25T19%3A14%3A11Z&sks=b&skv=2026-02-06&sig=IPZaEVinM0NRH4rhqRe0kHbmWewrzgjSFtIQelnJC4c%3D' -o /tmp/generated.tar.xz
-          echo 'd46ed30be758c69e9cad522104176b7f89959bd50cb44016b9a88fcf7aba1e8b  /tmp/android-overlay.tar.xz' | sha256sum -c -
+          echo '00412a8d3da3da9679a517abe5c9374e34ec25414fa16e5649e857cf418378b5  /tmp/android-overlay.tar.xz' | sha256sum -c -
           echo '6cb35a5ed10df1421452ce327b74cd410ceb852f3cff60aef4ff637763b2c72b  /tmp/generated.tar.xz' | sha256sum -c -
           tar -xJf /tmp/android-overlay.tar.xz
           tar -xJf /tmp/generated.tar.xz
