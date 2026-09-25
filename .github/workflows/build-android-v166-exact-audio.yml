@@ -1,0 +1,127 @@
+name: Build DKC1 Android v1.6.6 exact audio
+
+on:
+  push:
+    branches:
+      - build/android-v1.6.6-exact-audio
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+    steps:
+      - name: Checkout DKC1 fork
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Download v1.6.6 build inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-cee0-81f5-b691-595e3f3c53f8/raw?se=2026-09-25T03%3A18%3A26Z&sp=r&sv=2026-02-06&sr=b&scid=b7f268db-e184-582c-a3b6-d5061148a4f8&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-25T01%3A45%3A25Z&ske=2026-09-26T01%3A45%3A25Z&sks=b&skv=2026-02-06&sig=IXui/V%2B0kbIL6QraIapnDR7on2Bgp%2BsOEroscg/LTuM%3D' -o /tmp/android-overlay.tar.xz
+          curl --fail --location --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-0e8c-81f5-a0af-71d68c129817/raw?se=2026-09-25T03%3A18%3A53Z&sp=r&sv=2026-02-06&sr=b&scid=60ee5199-b9ef-5b0b-9832-7453d3a77b35&skoid=38550de5-1fab-49d1-9ebb-83af5557cc43&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-25T03%3A08%3A41Z&ske=2026-09-26T03%3A08%3A41Z&sks=b&skv=2026-02-06&sig=voObctXKUdL1zgYDJZVjTg3nGz4tfNF0oZ8wr7RzTGE%3D' -o /tmp/generated.tar.xz
+          echo 'd5cb0dd89c87bcf9762f722cad7c619da308b5d0652d4bc35f0ae52741b9b5f1  /tmp/android-overlay.tar.xz' | sha256sum -c -
+          echo '45f0e7752892e297a0a2c7b3e918383c44544c5bdabe95f29278a684a2d478e1  /tmp/generated.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/android-overlay.tar.xz
+          tar -xJf /tmp/generated.tar.xz
+
+          grep -q "versionCode 116" android/app/build.gradle
+          grep -q "versionName '1.6.6'" android/app/build.gradle
+          grep -q 'v1.6.6' android/app/src/main/java/com/ylports/dkc1recomp/OptionsPanel.java
+          grep -q '0x01A0 + ch' android/tools/apply_audio_split.py
+          ! grep -R -q 'Dkc1AndroidAudioNoteApuCommand' android
+          ! grep -q 'hostSfxVoiceMask' android/tools/apply_audio_split.py
+          ! grep -q 'hostPendingSfxCommands' android/tools/apply_audio_split.py
+
+      - name: Prepare pinned snesrecomp and exact DKC1 audio split
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf snesrecomp
+          mkdir snesrecomp
+          git -C snesrecomp init
+          git -C snesrecomp remote add origin https://github.com/elliotttate/snesrecomp.git
+          git -C snesrecomp fetch --depth 1 origin 851b11e38588818afc705e4270d3eb982b7b2af2
+          git -C snesrecomp checkout --detach FETCH_HEAD
+
+          git -C snesrecomp apply ../android/engine-patches/compat-v1.patch
+          git -C snesrecomp apply ../android/engine-patches/native-module-v1.patch
+          git apply android/engine-patches/native-module-host-v1.patch
+          python3 android/tools/apply_audio_split.py snesrecomp
+
+          grep -q 'dsp_audio_split_set_gains' snesrecomp/runner/src/snes/dsp.h
+          grep -q 'apu_ram\[0x01A0 + ch\]' snesrecomp/runner/src/snes/dsp.c
+          ! grep -q 'hostSfxVoiceMask' snesrecomp/runner/src/snes/dsp.c
+          ! grep -q 'hostPendingSfxCommands' snesrecomp/runner/src/snes/dsp.c
+
+      - name: Prepare pinned SDL2
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android/third_party/SDL2
+          mkdir -p android/third_party/SDL2
+          git -C android/third_party/SDL2 init
+          git -C android/third_party/SDL2 remote add origin https://github.com/libsdl-org/SDL.git
+          git -C android/third_party/SDL2 fetch --depth 1 origin c98c4fbff6d8f3016a3ce6685bf8f43433c3efcc
+          git -C android/third_party/SDL2 checkout --detach FETCH_HEAD
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -perm -u+x 2>/dev/null | sort -V | tail -n1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found" >&2
+            exit 1
+          fi
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          "$SDKMANAGER" --version
+
+      - name: Install pinned Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'cmake;3.22.1' 'ndk;28.2.13676358'
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
+
+      - name: Build and lint release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 android/tools/gradle_runner.py --no-daemon :app:assembleRelease :app:lintRelease
+          test -f android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Collect APK and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-output/build-tools
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk ci-output/DKC1-Android-v1.6.6-exact-audio-unsigned.apk
+          cp -a "$ANDROID_HOME/build-tools/35.0.0/." ci-output/build-tools/
+          cp android/app/build/reports/lint-results-release.html ci-output/ || true
+          sha256sum ci-output/DKC1-Android-v1.6.6-exact-audio-unsigned.apk > ci-output/SHA256SUMS.txt
+
+      - name: Upload unsigned release
+        uses: actions/upload-artifact@v4
+        with:
+          name: dkc1-android-v1.6.6-exact-audio
+          path: ci-output/
+          retention-days: 1
+          if-no-files-found: error
